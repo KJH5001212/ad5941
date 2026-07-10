@@ -9,7 +9,7 @@ WE-RE 간 **+0.5 V 고정 바이어스**, nA~µA 전류 측정, BLE 스트리밍
 |---|---|---|
 | AFE | **OPA2391** (듀얼) | A: 컨트롤 앰프 (CE 구동, RE 센스) / B: TIA (WE 전류→전압) |
 | 레퍼런스 | **REF35102QDBVR** (1.024 V) | WE 가상전위 + 바이어스 분압 원천 |
-| MCU/BLE/ADC | **nRF52832** | 내장 SAADC(차동, 12-bit+오버샘플링)로 측정, BLE 전송 |
+| MCU/BLE/ADC | **nRF52832-QFAA (칩다운)** | 내장 SAADC(차동, 12-bit+오버샘플링)로 측정, BLE 전송. 32 MHz 수정 + Johanson 매칭필터 + 칩안테나 |
 | LDO | **MIC5205-3.3** | 3.3 V 단일 레일 |
 | 무선충전 | **BQ51013BRHLR** | Qi 수신, 레귤레이티드 5 V 출력 (VQFN-20) |
 | 충전기 | **MCP73832T-2ACI/OT** | 리튬 충전 20 mA (=1000/RPROG), 종지 ~1.5 mA, SOT-23-5 |

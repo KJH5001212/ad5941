@@ -9,7 +9,10 @@
 | U1 | BQ51013BRHLR | VQFN-20 (RHL) | Qi 수신, 레귤레이티드 5 V 출력 |
 | U6 | MCP73832T-2ACI/OT | SOT-23-5 | 리튬 충전기 4.2 V / 20 mA, 종지 ~1.5 mA |
 | U2 | MIC5205-3.3YM5 | SOT-23-5 | 3.3 V LDO |
-| U3 | MDBT42Q-512KV2 (Raytac, nRF52832) | 41-pad 모듈 | MCU + BLE + SAADC |
+| U3 | nRF52832-QFAA | QFN48 6×6 (칩다운) | MCU + BLE + SAADC |
+| Y1 | 수정 32 MHz, CL 8 pF, ±10 ppm | 3225 | HFXO (BLE 필수) |
+| FL1 | Johanson 2450FM07A0029 | 0402 4-pin | nRF52 전용 임피던스 매칭 LPF (디스크리트 매칭 대체) |
+| E1 | Johanson 2450AT18B0100001E | 3.2×1.6 | 2.4 GHz 칩 안테나 |
 | U4 | OPA2391xDGK | VSSOP-8 | A: 컨트롤 앰프 / B: TIA |
 | U5 | REF35102QDBVR | SOT-23-6 | 1.024 V 레퍼런스 |
 | BT1 | LIR2032 + SMD 홀더 (Keystone 3034 등) | — | 3.7 V / ~40 mAh (보호회로 없음 — 펌웨어 컷오프 필수) |
@@ -41,7 +44,12 @@
 | C21 | 1 nF | **DNP** | 컨트롤 앰프 보상 (발진 시만 실장) |
 | C22 | 470 pF | C0G | CF — TIA 대역제한 (RF 교체 시 짝 교체) |
 | C23, C24 | 10 nF | C0G | SAADC 입력 RC |
-| C25, C26 | 10 µF + 100 nF | 10 V | 모듈 VDD |
+| C25 | 4.7 µF | 10 V | VDD 벌크 |
+| C26, C28, C29 | 100 nF ×3 | — | VDD 핀 13/36/48 디커플링 |
+| C30 | 100 nF | — | DEC1 |
+| C31 | 1 µF | — | DEC4 (DC/DC 출력) |
+| C32, C33 | 12 pF ×2 | C0G | 32 MHz 로드캡 (CL 8 pF 기준) |
+| C34 | (DNP) | C0G | 안테나 튜닝 션트 슬롯 |
 | C27 | 4.7 µF | 10 V | 배터리(+BATT) 측 |
 | R1 | 2.32 kΩ | 1% | ILIM 상단 — IMAX = 250/(R1+R2) ≈ 100 mA (5V 출력 전류 한도) |
 | R2 | 200 Ω | 1% | RFOD (FOD 탭, 캘리브레이션 시작값) |
@@ -54,6 +62,8 @@
 | R11 | 1 MΩ | 0.1% thin-film, ≤50 ppm/°C | **RF** (5.1 M/10 M 교체 풋프린트) |
 | R12, R13 | 1 kΩ ×2 | — | SAADC 입력 RC |
 | R14 | 1 kΩ | — | LED 직렬 |
+| R15 | 0 Ω | 0402 | 안테나 튜닝 직렬 슬롯 (초기 0R) |
+| L2, L3 | 10 µH (LQM21PN100) + 15 nH | 0805/0402 | DCC→DEC4 DC/DC 인덕터 (미사용 시 LDO 모드로 무해) |
 | TH1 | NTC 10 kΩ | B≈3380 | BQ51013B TS/CTRL — LIR2032 홀더 밀착 배치 |
 
 ## 참고
@@ -62,3 +72,4 @@
 - OPA2391 대체: OPA2392 (동급 상위).
 - 충전 체인은 2단(Qi 5 V → 저전류 충전기): BQ51050B 직접충전이 TI 공식으로 <200 mA 비권장이라 교체됨 (`design.md` §5).
 - 초소형화 시 동일 토폴로지로 BQ51003(DSBGA-28) + BQ25100(DSBGA-6) 교체 가능.
+- MCU는 칩다운(모듈 미사용) — 의도적 방사체 무선 인증(KC/FCC/CE RED) + 안테나 튜닝 필요. 결정 근거는 `module-vs-chipdown.md`.

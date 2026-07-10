@@ -63,6 +63,33 @@ CUSTOM_REF35 = '''(symbol "pstat:REF35102QDBVR" (in_bom yes) (on_board yes)
       )
     )'''
 
+
+CUSTOM_FL = '''(symbol "pstat:2450FM07A0029" (in_bom yes) (on_board yes)
+      (property "Reference" "FL" (at -5.08 6.35 0) (effects (font (size 1.27 1.27))))
+      (property "Value" "2450FM07A0029" (at 0 -6.35 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "pstat:Johanson_0402_4pin" (at 0 -8.89 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "https://www.johansontechnology.com/docs/1329/2450FM07A0029_yx4cUdW.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Description" "2.45GHz impedance-matched LPF for nRF52832/810/811 QFN, EIA 0402 4-pin" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "2450FM07A0029_0_1"
+        (rectangle (start -5.08 3.81) (end 5.08 -3.81)
+          (stroke (width 0.254) (type default)) (fill (type background)))
+      )
+      (symbol "2450FM07A0029_1_1"
+        (pin passive line (at -7.62 0 0) (length 2.54)
+          (name "IN" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at -2.54 -6.35 90) (length 2.54)
+          (name "GND" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 7.62 0 180) (length 2.54)
+          (name "OUT" (effects (font (size 1.27 1.27))))
+          (number "3" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 2.54 -6.35 90) (length 2.54)
+          (name "GND" (effects (font (size 1.27 1.27))))
+          (number "4" (effects (font (size 1.27 1.27)))))
+      )
+    )'''
+
 # MDBT42Q: pads 1-21 left (top->bottom), 22-41 right (bottom->top).
 # Pads 1-21 and 37-41 web-verified; 22-36 sequential reconstruction (see notes).
 MDBT_PINS = [
@@ -140,7 +167,12 @@ def build_symbol_library():
     opa = set_property(opa, 'Description', 'Dual precision op amp, fA input bias, RRIO, VSSOP-8')
     syms['pstat:OPA2391xDGK'] = prefix_libname(opa, 'OPA2391xDGK', 'pstat:OPA2391xDGK')
     syms['pstat:REF35102QDBVR'] = CUSTOM_REF35
-    syms['pstat:MDBT42Q'] = make_mdbt()
+    syms['pstat:2450FM07A0029'] = CUSTOM_FL
+    for base in ['Crystal','Antenna']:
+        syms['Device:'+base] = prefix_libname(load(base), base, 'Device:'+base)
+    nrf = load('nRF52832-QFxx')
+    nrf = set_property(nrf, 'Value', 'nRF52832-QFAA')
+    syms['MCU_Nordic:nRF52832-QFxx'] = prefix_libname(nrf, 'nRF52832-QFxx', 'MCU_Nordic:nRF52832-QFxx')
     return syms
 
 # ------------------------------------------------------------- pin parser ---
@@ -239,15 +271,34 @@ def layout():
     add('TP2','Connector:TestPoint', 70, 235, 'TP_TIA','TestPoint:TestPoint_Pad_D1.5mm', {'1':'TIA_OUT'})
     add('TP3','Connector:TestPoint', 80, 235, 'TP_VBIAS','TestPoint:TestPoint_Pad_D1.5mm', {'1':'VBIAS'})
     # ---------------- nRF module ----------------
-    mdbt_pins = {'1':GND, '11':V3, '12':GND, '30':GND, '40':GND,
-                 '15':'ADC_N', '16':'ADC_P', '17':'VBAT_DIV',
-                 '19':'AFE_PWR', '20':'LED_R', '21':'CHG_N',
-                 '35':'NRST', '37':'SWDCLK', '38':'SWDIO'}
-    for n,_,_ in MDBT_PINS:
-        mdbt_pins.setdefault(str(n), None)
-    add('U3','pstat:MDBT42Q', 280, 200, 'MDBT42Q-512KV2','pstat:Raytac_MDBT42Q', mdbt_pins)
-    add('C25','Device:C', 240, 155, '10u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':V3,'2':GND})
-    add('C26','Device:C', 250, 155, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':V3,'2':GND})
+    nrf_pins = {'1':'DEC1', '4':'ADC_N', '5':'ADC_P', '6':'VBAT_DIV',
+                '8':'AFE_PWR', '9':'LED_R', '10':'CHG_N',
+                '13':V3, '24':'NRST', '25':'SWDCLK', '26':'SWDIO',
+                '30':'ANT', '31':GND, '34':'XC1', '35':'XC2',
+                '36':V3, '45':GND, '46':'DEC4', '47':'DCC', '48':V3, '49':GND}
+    for n in list(range(1,50)):
+        nrf_pins.setdefault(str(n), None)
+    add('U3','MCU_Nordic:nRF52832-QFxx', 285, 205, 'nRF52832-QFAA','Package_DFN_QFN:QFN-48-1EP_6x6mm_P0.4mm_EP4.6x4.6mm', nrf_pins)
+    # supply decoupling per Nordic reference (QFN48)
+    add('C25','Device:C', 233, 152, '4.7u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':V3,'2':GND})
+    add('C26','Device:C', 243, 152, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':V3,'2':GND})
+    add('C28','Device:C', 253, 152, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':V3,'2':GND})
+    add('C29','Device:C', 263, 152, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':V3,'2':GND})
+    add('C30','Device:C', 273, 152, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':'DEC1','2':GND})
+    add('C31','Device:C', 283, 152, '1u 10V','Capacitor_SMD:C_0402_1005Metric', {'1':'DEC4','2':GND})
+    # DC/DC inductors DCC -> DEC4 (LDO-mode safe if unused)
+    add('L2','Device:L', 296, 152, '10uH LQM21PN100','Inductor_SMD:L_0805_2012Metric', {'1':'DCC','2':'DCDC_MID'})
+    add('L3','Device:L', 306, 152, '15nH','Inductor_SMD:L_0402_1005Metric', {'1':'DCDC_MID','2':'DEC4'})
+    # 32MHz crystal (CL 8pF) + load caps
+    add('Y1','Device:Crystal', 240, 250, '32MHz 8pF 10ppm','Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm', {'1':'XC1','2':'XC2'})
+    add('C32','Device:C', 228, 258, '12p C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'XC1','2':GND})
+    add('C33','Device:C', 250, 258, '12p C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'XC2','2':GND})
+    # RF chain: ANT -> matched filter -> tee (series 0R, shunt DNP) -> chip antenna
+    add('FL1','pstat:2450FM07A0029', 320, 245, '2450FM07A0029','pstat:Johanson_0402_4pin', {
+        '1':'ANT', '2':GND, '3':'ANT50', '4':GND})
+    add('R15','Device:R', 336, 245, '0R','Resistor_SMD:R_0402_1005Metric', {'1':'ANT50','2':'ANT_FEED'})
+    add('C34','Device:C', 336, 258, 'DNP (tune)','Capacitor_SMD:C_0402_1005Metric', {'1':'ANT_FEED','2':GND}, dnp=True)
+    add('E1','Device:Antenna', 348, 232, '2450AT18B0100001E','pstat:Johanson_2450AT18B100', {'1':'ANT_FEED'})
     add('R14','Device:R', 330, 165, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'LED_R','2':'LED_A'})
     add('D1','Device:LED', 330, 180, 'GREEN','LED_SMD:LED_0603_1608Metric', {'1':GND,'2':'LED_A'})
     add('J2','Connector_Generic:Conn_01x05', 340, 220, 'SWD','Connector_PinHeader_1.27mm:PinHeader_1x05_P1.27mm_Vertical', {
@@ -378,9 +429,10 @@ DESIGN NOTES / VERIFY BEFORE LAYOUT
 2. RESONANT TANK: L1 11uH (TDK WR202010-18M8-ID, 20x20x1.0mm, DCR 350mR).
    C1 = 1/(L*(2pi*100kHz)^2) = 230n -> 220n C0G (fs 102kHz). C2 -> fd ~1MHz -> 2.2n C0G.
    Retune both whenever the coil changes. Small coil = tighter TX alignment; fine at our 0.13W.
-3. MDBT42Q pads 22-36 are a sequential reconstruction (P0.09/NFC1 ... P0.23); pads 1-21 and
-   37-41 verified against the datasheet. Every pad actually used in this design is a verified
-   one. Cross-check the full pad table against the Raytac datasheet before PCB layout.
+3. CHIP-DOWN RF: copy Nordic's QFN48 reference layout verbatim (trace geometry included).
+   FL1 (Johanson 2450FM07A0029) replaces the discrete LC match for nRF52 single-ended ANT.
+   R15/C34 = antenna tee tuning slots (fit 0R / DNP initially, tune on real board with VNA).
+   DEC2, DEC3 unconnected per QFN48 reference; no 32k crystal -> firmware uses LFRC synth.
 4. TS/CTRL: 10k NTC against the LIR2032 holder cuts wireless power if the cell heats
    (plain 10k = sense defeated, still a valid safe strap). EN1=EN2=GND: wireless enabled.
 5. AFE_PWR is driven by nRF GPIO P0.06 set to high-drive. Load = REF35+OPA2391 ~ 60uA.
@@ -390,7 +442,8 @@ DESIGN NOTES / VERIFY BEFORE LAYOUT
    rf_ohm + oversample are runtime settings in firmware; recalibrate after a swap.
 8. R10/C21 control-amp compensation are DNP; fit only if the CE-RE loop oscillates.
 9. LIR2032 has no protection circuit: firmware must System-OFF below 3.0V (VBAT_DIV, AIN2).
-10. SAADC: differential P=AIN1(ADC_P) N=AIN0(ADC_N), gain 1/2..4, oversample 64x default.'''
+10. SAADC: differential P=AIN1(ADC_P) N=AIN0(ADC_N), gain 1/2..4, oversample 64x default.
+11. XL1/XL2 (P0.00/P0.01) free: no 32.768k crystal fitted. NFC pins unused -> plain GPIO/NC.'''
 
 def text_block(s, x, y, size=1.6, bold=False):
     esc = s.replace('"', "'").replace('\\', '\\\\').replace('\n', '\\n')
@@ -402,7 +455,7 @@ for s, x, y in [
     ('QI RECEIVER 5V (BQ51013B) + 20mA CHARGER (MCP73832)', 25, 35),
     ('BATTERY + 3.3V LDO + VBAT MONITOR', 225, 35),
     ('ANALOG FRONT-END: 2-OP-AMP POTENTIOSTAT (+0.512V)', 25, 165),
-    ('nRF52832 MODULE (MDBT42Q) + SWD + LED', 225, 145),
+    ('nRF52832 CHIP-DOWN + 32MHz XTAL + RF FRONT-END + SWD', 225, 138),
 ]:
     texts.append(text_block(s, x, y, 2.5, bold=True))
 
@@ -416,7 +469,7 @@ sch = f'''(kicad_sch (version 20230121) (generator eeschema)
     (date "2026-07-10")
     (rev "A")
     (company "discrete-potentiostat")
-    (comment 1 "OPA2391 + REF35102 + nRF52832(MDBT42Q) + MIC5205 + BQ51013B + MCP73832 + LIR2032")
+    (comment 1 "OPA2391 + REF35102 + nRF52832 chip-down + MIC5205 + BQ51013B + MCP73832 + LIR2032")
     (comment 2 "E = +0.512V fixed; I range set by RF (default 1M)")
   )
   (lib_symbols
