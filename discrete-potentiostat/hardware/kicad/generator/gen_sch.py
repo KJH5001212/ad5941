@@ -178,9 +178,9 @@ def layout():
         '7':None, '8':None, '9':GND, '10':GND, '11':GND, '12':'ILIM',
         '13':'TS', '14':'FOD', '15':'COMM2', '16':'CLAMP2', '17':'BOOT2',
         '18':'RECT', '19':'AC2', '20':GND, '21':GND})
-    add('L1','Device:L', 28, 68, '760308101303 47uH','pstat:Wurth_760308101303', {'1':'COIL','2':'AC2'})
-    add('C1','Device:C', 42, 68, '56n C0G 50V','Capacitor_SMD:C_1206_3216Metric', {'1':'COIL','2':'AC1'})
-    add('C2','Device:C', 54, 68, '560p C0G 50V','Capacitor_SMD:C_0603_1608Metric', {'1':'AC1','2':'AC2'})
+    add('L1','Device:L', 28, 68, '760308101214 26uH','pstat:Wurth_760308101214', {'1':'COIL','2':'AC2'})
+    add('C1','Device:C', 42, 68, '100n C0G 50V','Capacitor_SMD:C_1210_3225Metric', {'1':'COIL','2':'AC1'})
+    add('C2','Device:C', 54, 68, '1n C0G 50V','Capacitor_SMD:C_0603_1608Metric', {'1':'AC1','2':'AC2'})
     add('C3','Device:C', 28, 128, '10n','Capacitor_SMD:C_0402_1005Metric', {'1':'BOOT1','2':'AC1'})
     add('C4','Device:C', 40, 128, '10n','Capacitor_SMD:C_0402_1005Metric', {'1':'BOOT2','2':'AC2'})
     add('C5','Device:C', 52, 128, '22n 25V','Capacitor_SMD:C_0402_1005Metric', {'1':'COMM1','2':'AC1'})
@@ -375,8 +375,9 @@ DESIGN NOTES / VERIFY BEFORE LAYOUT
    MCP73832-2 (4.2V) charges the LIR2032: ICHG = 1000/RPROG = 1000/49.9k = 20mA (0.5C),
    termination ~7.5% = 1.5mA, open-drain STAT -> CHG_N (100k pullup to 3V3).
    This replaces the earlier BQ51050B direct-charge (TI: not recommended <200mA).
-2. RESONANT TANK: L1 47uH (Wurth 760308101303, dia 26.3mm). C1 = 1/(L*(2pi*100kHz)^2) = 54n -> 56n C0G.
-   C2 -> fd = 1MHz -> 560p C0G. Retune both whenever the coil changes.
+2. RESONANT TANK: L1 26uH (Wurth 760308101214, dia 19mm = battery-bounded device size).
+   C1 = 1/(L*(2pi*100kHz)^2) = 97n -> 100n C0G. C2 -> fd = 1MHz -> 1n C0G.
+   Retune both whenever the coil changes. Small coil = tighter TX alignment; fine at our 0.13W.
 3. MDBT42Q pads 22-36 are a sequential reconstruction (P0.09/NFC1 ... P0.23); pads 1-21 and
    37-41 verified against the datasheet. Every pad actually used in this design is a verified
    one. Cross-check the full pad table against the Raytac datasheet before PCB layout.
