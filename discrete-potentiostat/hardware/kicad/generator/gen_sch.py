@@ -86,7 +86,7 @@ def make_mdbt():
     top = 27.94
     lines = ['(symbol "pstat:MDBT42Q" (in_bom yes) (on_board yes)',
       '      (property "Reference" "U" (at -17.78 29.21 0) (effects (font (size 1.27 1.27))))',
-      '      (property "Value" "MDBT42Q-1MV2" (at 0 29.21 0) (effects (font (size 1.27 1.27))))',
+      '      (property "Value" "MDBT42Q-512KV2" (at 0 29.21 0) (effects (font (size 1.27 1.27))))',
       '      (property "Footprint" "pstat:Raytac_MDBT42Q" (at 0 -33.02 0) (effects (font (size 1.27 1.27)) hide))',
       '      (property "Datasheet" "https://www.raytac.com/product/ins.php?index_id=31" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))',
       '      (property "Description" "Raytac MDBT42Q nRF52832 BLE module, 41-pad LGA" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))',
@@ -245,7 +245,7 @@ def layout():
                  '35':'NRST', '37':'SWDCLK', '38':'SWDIO'}
     for n,_,_ in MDBT_PINS:
         mdbt_pins.setdefault(str(n), None)
-    add('U3','pstat:MDBT42Q', 280, 200, 'MDBT42Q-1MV2','pstat:Raytac_MDBT42Q', mdbt_pins)
+    add('U3','pstat:MDBT42Q', 280, 200, 'MDBT42Q-512KV2','pstat:Raytac_MDBT42Q', mdbt_pins)
     add('C25','Device:C', 240, 155, '10u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':V3,'2':GND})
     add('C26','Device:C', 250, 155, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':V3,'2':GND})
     add('R14','Device:R', 330, 165, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'LED_R','2':'LED_A'})

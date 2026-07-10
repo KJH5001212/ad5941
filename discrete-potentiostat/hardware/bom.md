@@ -9,7 +9,7 @@
 | U1 | BQ51013BRHLR | VQFN-20 (RHL) | Qi 수신, 레귤레이티드 5 V 출력 |
 | U6 | MCP73832T-2ACI/OT | SOT-23-5 | 리튬 충전기 4.2 V / 20 mA, 종지 ~1.5 mA |
 | U2 | MIC5205-3.3YM5 | SOT-23-5 | 3.3 V LDO |
-| U3 | MDBT42Q-1MV2 (Raytac, nRF52832) | 41-pad 모듈 | MCU + BLE + SAADC |
+| U3 | MDBT42Q-512KV2 (Raytac, nRF52832) | 41-pad 모듈 | MCU + BLE + SAADC |
 | U4 | OPA2391xDGK | VSSOP-8 | A: 컨트롤 앰프 / B: TIA |
 | U5 | REF35102QDBVR | SOT-23-6 | 1.024 V 레퍼런스 |
 | BT1 | LIR2032 + SMD 홀더 (Keystone 3034 등) | — | 3.7 V / ~40 mAh (보호회로 없음 — 펌웨어 컷오프 필수) |
