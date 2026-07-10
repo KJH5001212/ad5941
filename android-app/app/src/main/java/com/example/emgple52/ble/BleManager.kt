@@ -65,6 +65,10 @@ class BleManager(private val context: Context) {
     /** True once the RX (command) characteristic is available. */
     fun canSend(): Boolean = gatt != null && rxChar != null
 
+    /** Pending (unsent) writes in the queue. Used to skip coalescible ACKs when
+     *  the link is backed up, so ACKs don't pile up and stall real commands. */
+    fun queueDepth(): Int = synchronized(writeQueue) { writeQueue.size }
+
     /** Negotiated ATT MTU (23 until onMtuChanged). Diagnostic. */
     fun currentMtu(): Int = mtu
 
@@ -114,9 +118,12 @@ class BleManager(private val context: Context) {
             return
         }
         writesIssued++
-        // Fallback: some stacks don't fire onCharacteristicWrite for no-response
-        // writes -> advance after a short delay so the queue never stalls.
-        main.postDelayed(writeTimeout, 200)
+        // Fallback ONLY: with-response writes reliably fire onCharacteristicWrite,
+        // which advances the queue. This timeout must be LONGER than the slowest
+        // connection interval — a 200 ms timeout fired before the callback at a
+        // 1.5 s idle interval, advancing the queue mid-write -> GATT busy -> next
+        // write FAILED (dropped the start command). 2 s covers any sane interval.
+        main.postDelayed(writeTimeout, 2000)
     }
 
     private fun onWriteComplete() {

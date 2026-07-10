@@ -49,8 +49,13 @@ LOG_MODULE_REGISTER(pstat, LOG_LEVEL_INF);
 /* BLE 연결간격 (1.25ms 단위), supervision timeout (10ms 단위) */
 #define CONN_FAST_MIN  24       /* 30ms */
 #define CONN_FAST_MAX  40       /* 50ms */
-#define CONN_REST_MIN  1120     /* 1400ms */
-#define CONN_REST_MAX  1200     /* 1500ms */
+/* 유휴 간격을 측정 간격과 동일(빠름)하게 유지한다. 느린 유휴 간격(250ms~1.5s)은
+ * (1) stop 후 다음 start 응답이 느려지고(느림↔빠름 전환 지연),
+ * (2) 유휴 중 이벤트 몇 개만 놓쳐도 supervision timeout 으로 끊겼다.
+ * 상시 빠른 간격이면 전환 지연 없음 + 이벤트 여유 커서 끊김도 감소. 유휴 라디오
+ * 전력은 조금 오르지만 AFE 런 전력에 비하면 미미. */
+#define CONN_REST_MIN  24       /* 30ms (= FAST) */
+#define CONN_REST_MAX  40       /* 50ms (= FAST) */
 #define CONN_TIMEOUT   500      /* 5000ms (iOS: interval*3 < timeout) */
 
 /* RTIA 오토레인지 테이블: index0=최고감도(512k, ~1nA) ... 낮을수록 큰 전류.
@@ -375,11 +380,25 @@ static void meas_thread(void)
 {
 	while (1) {
 		k_sem_take(&start_sem, K_FOREVER);
+		/* AFE 상태를 가벼운 SPI 읽기로 재확인한다(리셋 아님).
+		 *  - 살아있으면(0x4144) 그대로 진행 → 빠름, 무부하.
+		 *  - 죽었을 때만 HWReset+재초기화로 되살린다(최대 3회) → 리플래시 없이
+		 *    Start 만으로 복구하되, 매번 리셋하지 않아 재안정화 지연/전원부담 없음.
+		 * (매 start 마다 무조건 HWReset 하면 재안정화로 느려지고 반복 리셋이
+		 *  전원을 눌러 브라운아웃을 유발했다.) */
+		g_adiid[0] = AD5940_ReadReg(REG_AFECON_ADIID);
 		if (g_adiid[0] != AD5940_ADIID) {
-			LOG_ERR("AFE 미확인 — start 거부");
-			atomic_set(&g_state, PSTAT_IDLE);
-			status_req = true;
-			continue;
+			LOG_WRN("AFE 무응답(0x%04x) — 재초기화 시도", g_adiid[0]);
+			int afe_try = 0;
+			while (ad5941_afe_init() != 0 && ++afe_try < 3) {
+				k_msleep(30);
+			}
+			if (g_adiid[0] != AD5940_ADIID) {
+				LOG_ERR("AFE 재초기화 실패 — start 거부");
+				atomic_set(&g_state, PSTAT_IDLE);
+				status_req = true;
+				continue;
+			}
 		}
 		k_mutex_lock(&cfg_lock, K_FOREVER);
 		rc = g_cfg;   /* 스냅샷 */
@@ -598,7 +617,14 @@ int main(void)
 		return 0;
 	}
 	k_msleep(10);
-	if (ad5941_afe_init() != 0) {
+	/* AFE init 실패 시 최대 5회 재시도(HWReset 반복). 마진 부족 부팅에서
+	 * AFE 가 한 번에 안 올라와도 되살아날 확률을 높인다. */
+	int boot_try = 0;
+	while (ad5941_afe_init() != 0 && ++boot_try < 5) {
+		LOG_WRN("AFE init 실패, 재시도 %d/5", boot_try);
+		k_msleep(50);
+	}
+	if (g_adiid[0] != AD5940_ADIID) {
 		LOG_WRN("ADIID mismatch — BLE 는 올리되 측정 불가");
 	}
 	/* 부팅 후 AFE 는 꺼둔 상태 (start 명령 대기) */

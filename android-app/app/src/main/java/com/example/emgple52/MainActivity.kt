@@ -51,7 +51,11 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
     private val lock = Any()
 
     private var connected = false
-    private var running = false
+    @Volatile private var running = false
+    // Stop 을 누른 뒤, 기기가 아직 stop 을 처리 못 해 잠깐 더 오는 stale "run"
+    // 상태 때문에 재조정이 running 을 되살리는 것을 막는 가드. 기기가 idle 을
+    // 확인하면 해제된다.
+    @Volatile private var userStopping = false
     private var lastAckMs = 0L
     private var recStartMs = 0L
     private var startedAtMs = 0L   // when Start was tapped (grace before trusting "idle")
@@ -127,6 +131,7 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
     // ---------------- commands ----------------
 
     private fun sendStart() {
+        android.util.Log.d("BLE", "CMD sendStart (was running=$running canSend=${ble.canSend()})")
         if (!ble.canSend()) { toast("Not connected"); return }
         val rate = b.etRate.text.toString().toIntOrNull()?.coerceIn(1, 100) ?: 10
         val auto = if (b.swAuto.isChecked) 1 else 0
@@ -147,15 +152,30 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
         b.waveLive.clearData()
         synchronized(lock) { pending.clear() }
         if (!ble.send(json.toByteArray())) { toast("Send failed"); return }
+        userStopping = false
         running = true; startedAtMs = SystemClock.elapsedRealtime(); updateRunBtn()
         if (!recorder.recording) startRecording()
         toast("Started ($mode)")
     }
 
     private fun sendStop() {
+        android.util.Log.d("BLE", "CMD sendStop (was running=$running)")
         ble.send("{\"cmd\":\"stop\"}".toByteArray())
+        userStopping = true
         running = false; updateRunBtn()
         if (recorder.recording) stopRecordingAndSave()
+        clearLiveView()   // BLE 연결은 유지, 그래프/수신 캐시만 리셋
+    }
+
+    /** Stop 후 화면과 수신 캐시를 깨끗이 비운다. BLE 연결은 건드리지 않는다. */
+    private fun clearLiveView() {
+        synchronized(lock) { pending.clear() }
+        parser.reset()                 // 파서 내부 버퍼/seq/state 초기화
+        b.waveLive.clearData()
+        b.tvCurrent.text = "— nA"
+        b.tvRange.text = "—"
+        b.tvState.text = "idle"
+        b.waveLive.postInvalidateOnAnimation()
     }
 
     private fun updateRunBtn() {
@@ -198,10 +218,11 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
     }
 
     override fun onNotifyReady(uuid: String) {
-        // Ask the phone for a fast connection interval right away. Otherwise the
-        // link sits at the slow (idle) interval and data arrives in a big burst
-        // ~10 s in (after the interval finally speeds up) — the "batched" delay.
-        ble.requestHighPriority(true)
+        // BALANCED (~30-50 ms) instead of HIGH (~12 ms): fast enough that 10 Hz data
+        // streams smoothly (no "10 s batch"), but draws far less radio power than HIGH.
+        // On this power-marginal board, HIGH's extra draw during afe_start's power-up
+        // inrush was tipping it into brown-out (PC/bleak used a slow interval -> 5/5 stable).
+        ble.requestHighPriority(false)
         ui.postDelayed({ if (ble.canSend()) ble.send("{\"cmd\":\"status\"}".toByteArray()) }, 300)
     }
 
@@ -235,7 +256,9 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
         synchronized(lock) {
             if (pending.isNotEmpty()) { drained = ArrayList(pending); pending.clear() } else drained = emptyList()
         }
-        if (drained.isNotEmpty()) {
+        // pending 은 항상 비운다(누적 방지). 그리기·기록은 측정 중(running)일 때만
+        // → Stop 후 뒤늦게 온 잔여 프레임은 조용히 폐기되어 화면을 재오염 안 함.
+        if (running && drained.isNotEmpty()) {
             for (s in drained) {
                 b.waveLive.push(s.currentNa)
                 if (recorder.recording) {
@@ -246,6 +269,8 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
             b.tvCurrent.text = String.format(Locale.US, "%.3f nA", last.currentNa)
             b.tvRange.text = rangeLabel(last.range)
             b.waveLive.postInvalidateOnAnimation()
+        } else if (drained.isNotEmpty()) {
+            android.util.Log.d("BLE", "TICK dropped ${drained.size} samples by running-gate (running=false)")
         }
 
         val now = SystemClock.elapsedRealtime()
@@ -253,17 +278,23 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
         // periodic ACK (frees device lossless buffer) + reconcile run state / status UI
         if (connected && now - lastAckMs >= 500) {
             lastAckMs = now
-            if (parser.maxSeq >= 0) ble.send("{\"cmd\":\"ack\",\"seq\":${parser.maxSeq}}".toByteArray())
+            // ACK 는 누적식(seq 이하 전부 해제) → 큐가 밀려있으면 건너뛴다.
+            // 다음 ACK 가 더 높은 seq 로 커버하므로 손실 없음. ACK 가 큐에 쌓여
+            // start/stop 명령을 밀어내고 결국 연결이 끊기던 것을 방지.
+            if (parser.maxSeq >= 0 && ble.queueDepth() < 3) ble.send("{\"cmd\":\"ack\",\"seq\":${parser.maxSeq}}".toByteArray())
 
             // Reconcile the button with the device's reported state.
             // "run"/"rest" -> confirm running. "idle" -> only trust after a grace
             // window, so we don't revert before the device's first status arrives.
             val st = parser.state
             val dev = st == "run" || st == "rest"
-            if (dev) {
-                if (!running) { running = true; updateRunBtn() }
-            } else if (running && now - startedAtMs > 3000) {
-                running = false; updateRunBtn()
+            if (dev && !userStopping) {
+                if (!running) { android.util.Log.d("BLE", "RECON running->TRUE (st=$st)"); running = true; updateRunBtn() }
+            } else if (!dev) {
+                if (userStopping) { userStopping = false; android.util.Log.d("BLE", "RECON stop confirmed (idle)") }
+                if (running && now - startedAtMs > 5000) {
+                    android.util.Log.d("BLE", "RECON running->FALSE (grace expired, st=$st)"); running = false; updateRunBtn()
+                }
             }
 
             b.tvState.text = when (st) {

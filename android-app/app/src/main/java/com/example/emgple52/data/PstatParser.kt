@@ -47,6 +47,7 @@ class PstatParser {
         lineBuf.setLength(0)
         beginRun()
         lastStatus = null
+        state = "idle"   // 상태도 초기화 — stop 후 stale "run" 으로 재조정이 running 을 되살리는 것 방지
     }
 
     @Synchronized
