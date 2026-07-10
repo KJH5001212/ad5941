@@ -13,7 +13,7 @@
 | U4 | OPA2391xDGK | VSSOP-8 | A: 컨트롤 앰프 / B: TIA |
 | U5 | REF35102QDBVR | SOT-23-6 | 1.024 V 레퍼런스 |
 | BT1 | LIR2032 + SMD 홀더 (Keystone 3034 등) | — | 3.7 V / ~40 mAh (보호회로 없음 — 펌웨어 컷오프 필수) |
-| L1 | Würth 760308101214 | **Ø19 mm** | Qi RX 코일, **26 µH** (배터리 Ø20 기준으로 크기 결정) |
+| L1 | TDK WR202010-18M8-ID | **20×20×1.0 mm** | Qi RX 코일, **11 µH ±5%**, DCR 350 mΩ, ~$3.6 |
 | D1 | LED GREEN 0603 | — | 상태 표시 (P0.07) |
 | J1 | 1×3 헤더/FPC | 2.54 mm | 전극 CE/RE/WE |
 | J2 | 1×5 헤더 | 1.27 mm | SWD (3V3/SWDIO/SWDCLK/RESET/GND) |
@@ -23,8 +23,8 @@
 
 | Ref | 값 | 사양 | 역할 |
 |---|---|---|---|
-| C1 | 100 nF | C0G 50 V, 1210 | 직렬 공진 (fs≈100 kHz, L=26 µH 기준) |
-| C2 | 1 nF | C0G 50 V | 병렬 공진 (fd≈1 MHz) |
+| C1 | 220 nF | C0G 50 V, 1210 | 직렬 공진 (fs≈102 kHz, L=11 µH 기준) |
+| C2 | 2.2 nF | C0G 50 V | 병렬 공진 (fd≈1 MHz) |
 | C3, C4 | 10 nF | 25 V | BOOT1/BOOT2 → AC1/AC2 |
 | C5, C6 | 22 nF | 25 V | COMM1/COMM2 → AC1/AC2 |
 | C7, C8 | 470 nF | 25 V | CLAMP1/CLAMP2 → AC1/AC2 |
