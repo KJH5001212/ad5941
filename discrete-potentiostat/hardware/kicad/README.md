@@ -7,14 +7,15 @@
 
 | 항목 | 상태 |
 |---|---|
-| 넷 연결 | ✅ **설계 넷리스트 37개 vs `kicad-cli` 추출 넷리스트 완전 일치** (`generator/check_nets.py`) |
-| BQ51050BRHL 핀맵 | ✅ KiCad 공식 라이브러리 심볼 (데이터시트 대조 검수본) |
+| 넷 연결 | ✅ **설계 넷리스트 38개 vs `kicad-cli` 추출 넷리스트 완전 일치** (`generator/check_nets.py`) |
+| BQ51013BRHL 핀맵 | ✅ KiCad 공식 BQ51050BRHL 심볼(동일 계열 패키지) 기반 + 차이 핀(4 OUT, 10 EN1) 데이터시트 확인 |
+| MCP73832 핀맵 | ✅ KiCad 공식 라이브러리 (1 STAT / 2 VSS / 3 VBAT / 4 VDD / 5 PROG) |
 | MIC5205 핀맵 | ✅ KiCad 공식 라이브러리 (1 IN / 2 GND / 3 EN / 4 BYP / 5 OUT) |
 | OPA2391 DGK 핀맵 | ✅ 데이터시트 확인 (표준 듀얼: 1 OUTA / 2 −INA / 3 +INA / 4 V− / 5 +INB / 6 −INB / 7 OUTB / 8 V+) |
 | REF35102 DBV 핀맵 | ✅ 데이터시트 확인 (1,2 GND / 3 EN / 4 VIN / 5 NR / 6 VREF) |
 | MDBT42Q 패드 1–21, 37–41 | ✅ 데이터시트 교차검증 |
 | MDBT42Q 패드 22–36 | ⚠️ 순차 재구성 (P0.09/NFC1…P0.23) — **PCB 전에 Raytac 데이터시트 원본으로 대조** |
-| 충전전류 공식 | ✅ IBULK = 314/RILIM (A·Ω), TERM 240 Ω/% |
+| 충전전류 공식 | ✅ MCP73832: ICHG = 1000/RPROG = 20 mA · BQ51013B ILIM: RILIM = 250/IMAX |
 
 **설계상 사용하는 모듈 패드는 전부 검증된 패드만 배정** (AIN0/1/2=15/16/17, P0.06/07/08=19/20/21, SWD=37/38, VDD=11, GND=1/12/40). 미검증 구간(22–36)에서 실제 연결된 것은 GND(30)와 SWD 헤더의 RESET(35)뿐이고, 둘 다 틀려도 동작을 깨지 않는 위치다(RESET 없이도 SWD 프로그래밍 가능).
 
@@ -45,7 +46,7 @@ python3 check_nets.py                  # 넷리스트 일치 확인 (RESULT: PAS
 
 ## 회로도에 박혀 있는 주의사항 (DESIGN NOTES 텍스트 블록)
 
-1. 충전전류 20 mA는 BQ51050B 권장 범위(≥200 mA) 밖 — 셀 밀봉 전 충전 프로파일 실측 필수, 대안 BQ51003+BQ25100
+1. 충전은 2단: BQ51013B(Qi→5V, ILIM 100 mA) + MCP73832(20 mA/4.2 V, 종지 1.5 mA) — BQ51050B 직접충전(TI <200 mA 비권장) 대체
 2. 공진탱크는 L=47 µH 기준 — 코일 변경 시 C1/C2 재계산
 3. MDBT42Q 패드 22–36 재구성 — PCB 전 대조
 4. WE 노드 가드링(VREF 구동), 플럭스 세정

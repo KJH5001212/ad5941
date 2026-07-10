@@ -19,7 +19,7 @@ WANTED = [
     ('power.kicad_sym', ['GND','+3V3','+BATT','PWR_FLAG']),
     ('Connector.kicad_sym', ['TestPoint']),
     ('Connector_Generic.kicad_sym', ['Conn_01x03','Conn_01x05']),
-    ('Battery_Management.kicad_sym', ['BQ51050BRHL']),
+    ('Battery_Management.kicad_sym', ['BQ51050BRHL','MCP73832-2-OT']),  # BQ51050BRHL is the pin-map base for BQ51013BRHL
     ('Regulator_Linear.kicad_sym', ['AP131-15']),      # geometry base for MIC5205-3.3YM5
     ('Amplifier_Operational.kicad_sym', ['LM2904']),   # geometry base for OPA2391xDGK
 ]

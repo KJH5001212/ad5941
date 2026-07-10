@@ -118,7 +118,15 @@ def build_symbol_library():
     syms['Connector:TestPoint'] = prefix_libname(load('TestPoint'), 'TestPoint', 'Connector:TestPoint')
     for base in ['Conn_01x03','Conn_01x05']:
         syms['Connector_Generic:'+base] = prefix_libname(load(base), base, 'Connector_Generic:'+base)
-    syms['Battery_Management:BQ51050BRHL'] = prefix_libname(load('BQ51050BRHL'), 'BQ51050BRHL', 'Battery_Management:BQ51050BRHL')
+    bq = rename_block(load('BQ51050BRHL'), 'BQ51050BRHL', 'BQ51013BRHL')
+    bq = bq.replace('(name "BAT"', '(name "OUT"').replace('(name "TERM"', '(name "EN1"')
+    bq = set_property(bq, 'Value', 'BQ51013BRHL')
+    bq = set_property(bq, 'Datasheet', 'https://www.ti.com/lit/ds/symlink/bq51013b.pdf')
+    bq = set_property(bq, 'Description', 'Qi WPC v1.2 wireless power receiver, regulated 5V output, VQFN-20 (pin map = BQ51050BRHL family; pin4 OUT, pin10 EN1)')
+    syms['pstat:BQ51013BRHL'] = prefix_libname(bq, 'BQ51013BRHL', 'pstat:BQ51013BRHL')
+    mcp = load('MCP73832-2-OT')
+    mcp = set_property(mcp, 'Value', 'MCP73832T-2ACI/OT')
+    syms['Battery_Management:MCP73832-2-OT'] = prefix_libname(mcp, 'MCP73832-2-OT', 'Battery_Management:MCP73832-2-OT')
     mic = rename_block(load('AP131-15'), 'AP131-15', 'MIC5205-3.3YM5')
     mic = set_property(mic, 'Value', 'MIC5205-3.3YM5')
     mic = set_property(mic, 'Footprint', 'Package_TO_SOT_SMD:SOT-23-5')
@@ -165,9 +173,9 @@ GND, V3, VB = '=GND', '=+3V3', '=+BATT'
 
 def layout():
     # ---------------- Qi receiver / charger ----------------
-    add('U1','Battery_Management:BQ51050BRHL', 90, 90, 'BQ51050BRHLR','Package_DFN_QFN:Texas_VQFN-RHL-20', {
-        '1':GND, '2':'AC1', '3':'BOOT1', '4':'VBAT_CHG', '5':'CLAMP1', '6':'COMM1',
-        '7':'CHG_N', '8':None, '9':GND, '10':'TERM', '11':GND, '12':'ILIM',
+    add('U1','pstat:BQ51013BRHL', 90, 90, 'BQ51013BRHLR','Package_DFN_QFN:Texas_VQFN-RHL-20', {
+        '1':GND, '2':'AC1', '3':'BOOT1', '4':'V5OUT', '5':'CLAMP1', '6':'COMM1',
+        '7':None, '8':None, '9':GND, '10':GND, '11':GND, '12':'ILIM',
         '13':'TS', '14':'FOD', '15':'COMM2', '16':'CLAMP2', '17':'BOOT2',
         '18':'RECT', '19':'AC2', '20':GND, '21':GND})
     add('L1','Device:L', 28, 68, '760308101303 47uH','pstat:Wurth_760308101303', {'1':'COIL','2':'AC2'})
@@ -180,13 +188,16 @@ def layout():
     add('C7','Device:C', 76, 128, '470n 25V','Capacitor_SMD:C_0603_1608Metric', {'1':'CLAMP1','2':'AC1'})
     add('C8','Device:C', 88, 128, '470n 25V','Capacitor_SMD:C_0603_1608Metric', {'1':'CLAMP2','2':'AC2'})
     add('C9','Device:C', 126, 128, '10u 25V','Capacitor_SMD:C_0805_2012Metric', {'1':'RECT','2':GND})
-    add('R1','Device:R', 140, 128, '15.4k 1%','Resistor_SMD:R_0402_1005Metric', {'1':'ILIM','2':'FOD'})
+    add('R1','Device:R', 140, 128, '2.32k 1%','Resistor_SMD:R_0402_1005Metric', {'1':'ILIM','2':'FOD'})
     add('R2','Device:R', 152, 128, '200R 1%','Resistor_SMD:R_0402_1005Metric', {'1':'FOD','2':GND})
-    add('R3','Device:R', 164, 128, '2.4k 1%','Resistor_SMD:R_0402_1005Metric', {'1':'TERM','2':GND})
+    add('R3','Device:R', 268, 107, '49.9k 1%','Resistor_SMD:R_0402_1005Metric', {'1':'PROG','2':GND})
     add('TH1','Device:Thermistor_NTC', 176, 128, 'NTC 10k','Resistor_SMD:R_0402_1005Metric', {'1':'TS','2':GND})
-    add('C10','Device:C', 135, 52, '1u 10V','Capacitor_SMD:C_0402_1005Metric', {'1':'VBAT_CHG','2':GND})
-    add('C11','Device:C', 147, 52, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':'VBAT_CHG','2':GND})
+    add('C10','Device:C', 135, 52, '4.7u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':'V5OUT','2':GND})
+    add('C11','Device:C', 147, 52, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':'V5OUT','2':GND})
     add('R4','Device:R', 159, 52, '100k','Resistor_SMD:R_0402_1005Metric', {'1':V3,'2':'CHG_N'})
+    add('U6','Battery_Management:MCP73832-2-OT', 245, 102, 'MCP73832T-2ACI/OT','Package_TO_SOT_SMD:SOT-23-5', {
+        '4':'V5OUT', '2':GND, '3':VB, '5':'PROG', '1':'CHG_N'})
+    add('C27','Device:C', 280, 102, '4.7u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':VB,'2':GND})
     # ---------------- battery + LDO + monitor ----------------
     add('BT1','Device:Battery_Cell', 230, 60, 'LIR2032','Battery:BT_Keystone_3034_1x2032', {'1':VB,'2':GND})
     add('U2','pstat:MIC5205-3.3YM5', 270, 55, 'MIC5205-3.3YM5','Package_TO_SOT_SMD:SOT-23-5', {
@@ -249,7 +260,7 @@ def layout():
 layout()
 
 # Net alias: BQ BAT output and battery positive are the same copper
-ALIAS = {'VBAT_CHG': '+BATT', 'AFE_PWR_FLAG': 'AFE_PWR'}
+ALIAS = {'AFE_PWR_FLAG': 'AFE_PWR'}
 
 # ------------------------------------------------------------- generation ---
 SYMS = build_symbol_library()
@@ -359,16 +370,18 @@ NOTES = r'''DISCRETE POTENTIOSTAT - wireless-charged 3-electrode chronoamperomet
 E_cell = WE - RE = 1.024V - 0.512V = +0.512V fixed.  I_WE = (V(ADC_P)-V(ADC_N))/RF
 
 DESIGN NOTES / VERIFY BEFORE LAYOUT
-1. CHARGE CURRENT: IBULK = 314/RILIM = 314/(R1+R2) = 314/15.6k = 20mA (LIR2032 0.5C).
-   TI states BQ5105xB regulates best >=200mA; at 20mA expect loose regulation and wide
-   termination spread (R3 2.4k = 10% term). Validate the charge profile before enclosing
-   the cell. Safer alternative for a 40mAh coin cell: BQ51003 + BQ25100.
+1. CHARGING: two-stage per TI guidance for small cells. BQ51013B = Qi receiver with
+   regulated 5V (V5OUT), ILIM: RILIM = 250/IMAX = R1+R2 = 2.52k -> IMAX 100mA (HW limit 120mA).
+   MCP73832-2 (4.2V) charges the LIR2032: ICHG = 1000/RPROG = 1000/49.9k = 20mA (0.5C),
+   termination ~7.5% = 1.5mA, open-drain STAT -> CHG_N (100k pullup to 3V3).
+   This replaces the earlier BQ51050B direct-charge (TI: not recommended <200mA).
 2. RESONANT TANK: L1 47uH (Wurth 760308101303, dia 26.3mm). C1 = 1/(L*(2pi*100kHz)^2) = 54n -> 56n C0G.
    C2 -> fd = 1MHz -> 560p C0G. Retune both whenever the coil changes.
 3. MDBT42Q pads 22-36 are a sequential reconstruction (P0.09/NFC1 ... P0.23); pads 1-21 and
    37-41 verified against the datasheet. Every pad actually used in this design is a verified
    one. Cross-check the full pad table against the Raytac datasheet before PCB layout.
-4. TS: 10k NTC placed against the LIR2032 holder (fixed 10k = temp sense defeated, safe cond).
+4. TS/CTRL: 10k NTC against the LIR2032 holder cuts wireless power if the cell heats
+   (plain 10k = sense defeated, still a valid safe strap). EN1=EN2=GND: wireless enabled.
 5. AFE_PWR is driven by nRF GPIO P0.06 set to high-drive. Load = REF35+OPA2391 ~ 60uA.
    Power the AFE off between runs to avoid electrode polarization.
 6. WE net: guard ring driven from VREF, no soldermask opening at TIA input, clean flux.
@@ -385,7 +398,7 @@ def text_block(s, x, y, size=1.6, bold=False):
 
 texts = [text_block(NOTES, 362, 200, 1.7)]
 for s, x, y in [
-    ('QI WIRELESS RECEIVER + CHARGER (BQ51050B)', 25, 35),
+    ('QI RECEIVER 5V (BQ51013B) + 20mA CHARGER (MCP73832)', 25, 35),
     ('BATTERY + 3.3V LDO + VBAT MONITOR', 225, 35),
     ('ANALOG FRONT-END: 2-OP-AMP POTENTIOSTAT (+0.512V)', 25, 165),
     ('nRF52832 MODULE (MDBT42Q) + SWD + LED', 225, 145),
@@ -402,7 +415,7 @@ sch = f'''(kicad_sch (version 20230121) (generator eeschema)
     (date "2026-07-10")
     (rev "A")
     (company "discrete-potentiostat")
-    (comment 1 "OPA2391 + REF35102 + nRF52832(MDBT42Q) + MIC5205 + BQ51050B + LIR2032")
+    (comment 1 "OPA2391 + REF35102 + nRF52832(MDBT42Q) + MIC5205 + BQ51013B + MCP73832 + LIR2032")
     (comment 2 "E = +0.512V fixed; I range set by RF (default 1M)")
   )
   (lib_symbols

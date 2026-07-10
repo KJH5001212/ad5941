@@ -6,7 +6,8 @@
 
 | Ref | 부품 | 패키지 | 역할 |
 |---|---|---|---|
-| U1 | BQ51050BRHLR | VQFN-20 (RHL) | Qi 수신 + 리튬 직접충전 (4.2 V) |
+| U1 | BQ51013BRHLR | VQFN-20 (RHL) | Qi 수신, 레귤레이티드 5 V 출력 |
+| U6 | MCP73832T-2ACI/OT | SOT-23-5 | 리튬 충전기 4.2 V / 20 mA, 종지 ~1.5 mA |
 | U2 | MIC5205-3.3YM5 | SOT-23-5 | 3.3 V LDO |
 | U3 | MDBT42Q-1MV2 (Raytac, nRF52832) | 41-pad 모듈 | MCU + BLE + SAADC |
 | U4 | OPA2391xDGK | VSSOP-8 | A: 컨트롤 앰프 / B: TIA |
@@ -28,7 +29,7 @@
 | C5, C6 | 22 nF | 25 V | COMM1/COMM2 → AC1/AC2 |
 | C7, C8 | 470 nF | 25 V | CLAMP1/CLAMP2 → AC1/AC2 |
 | C9 | 10 µF | 25 V, 0805 | RECT |
-| C10, C11 | 1 µF + 100 nF | 10 V | BAT 핀 |
+| C10, C11 | 4.7 µF + 100 nF | 10 V | V5OUT (BQ51013B OUT = MCP73832 입력) |
 | C12 | 1 µF | 10 V | LDO 입력 |
 | C13 | 2.2 µF | 10 V | LDO 출력 (세라믹, ≥1 µF) |
 | C14 | 470 pF | — | MIC5205 BYP (노이즈 저감) |
@@ -41,9 +42,10 @@
 | C22 | 470 pF | C0G | CF — TIA 대역제한 (RF 교체 시 짝 교체) |
 | C23, C24 | 10 nF | C0G | SAADC 입력 RC |
 | C25, C26 | 10 µF + 100 nF | 10 V | 모듈 VDD |
-| R1 | 15.4 kΩ | 1% | ILIM 상단 — IBULK = 314/(R1+R2) ≈ 20 mA |
+| C27 | 4.7 µF | 10 V | 배터리(+BATT) 측 |
+| R1 | 2.32 kΩ | 1% | ILIM 상단 — IMAX = 250/(R1+R2) ≈ 100 mA (5V 출력 전류 한도) |
 | R2 | 200 Ω | 1% | RFOD (FOD 탭, 캘리브레이션 시작값) |
-| R3 | 2.4 kΩ | 1% | TERM — 종지 10% (240 Ω/%) |
+| R3 | 49.9 kΩ | 1% | MCP73832 PROG — ICHG = 1000/RPROG = 20 mA |
 | R4 | 100 kΩ | — | /CHG 풀업 → 3V3 |
 | R5, R6 | 1 MΩ ×2 | 1% | VBAT 모니터 분압 → AIN2 |
 | R7, R8 | 1 MΩ ×2 | 1% 페어 | 1:1 바이어스 분압 → VBIAS 0.512 V |
@@ -52,10 +54,11 @@
 | R11 | 1 MΩ | 0.1% thin-film, ≤50 ppm/°C | **RF** (5.1 M/10 M 교체 풋프린트) |
 | R12, R13 | 1 kΩ ×2 | — | SAADC 입력 RC |
 | R14 | 1 kΩ | — | LED 직렬 |
-| TH1 | NTC 10 kΩ | B≈3380 | BQ51050B TS — LIR2032 홀더 밀착 배치 |
+| TH1 | NTC 10 kΩ | B≈3380 | BQ51013B TS/CTRL — LIR2032 홀더 밀착 배치 |
 
 ## 참고
 
 - RF/CF 교체 옵션: 1 M/470 p(기본) · 5.1 M/100 p · 10 M/47 p — 펌웨어 `rf_ohm`/`oversample`은 런타임 설정.
 - OPA2391 대체: OPA2392 (동급 상위).
-- ⚠️ BQ51050B는 TI 공식적으로 200 mA 미만 충전에 비권장 — 상세는 `design.md` §5. 코인셀 안전 대안: BQ51003 + BQ25100.
+- 충전 체인은 2단(Qi 5 V → 저전류 충전기): BQ51050B 직접충전이 TI 공식으로 <200 mA 비권장이라 교체됨 (`design.md` §5).
+- 초소형화 시 동일 토폴로지로 BQ51003(DSBGA-28) + BQ25100(DSBGA-6) 교체 가능.
