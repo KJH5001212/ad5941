@@ -1,0 +1,14 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+r
+g
+Sleep 2500
+h
+// g_adiid[0..3]
+mem32 0x200034a0, 4
+// g_state
+mem32 0x20003498, 1
+g
+qc

@@ -1,0 +1,22 @@
+# ── Firmware (Zephyr/NCS) build outputs ──
+firmware/build/
+firmware/build_*/
+firmware/twister-out*/
+
+# ── Android build outputs ──
+android-app/build/
+android-app/**/build/
+android-app/.gradle/
+android-app/.idea/
+android-app/.kotlin/
+android-app/captures/
+android-app/local.properties
+android-app/app/release/
+*.apk
+*.aab
+
+# ── misc ──
+*.log
+*.tmp
+Thumbs.db
+.DS_Store

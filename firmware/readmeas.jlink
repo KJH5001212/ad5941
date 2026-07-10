@@ -1,0 +1,10 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+// 실행 중 두 번 읽어 meas_count 증가 확인 (halt 없이 메모리만 읽기)
+mem32 0x20003c44, 3
+Sleep 2000
+mem32 0x20003c44, 3
+mem8 0x20003fed, 1
+qc

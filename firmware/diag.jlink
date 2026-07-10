@@ -1,0 +1,17 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+r
+g
+Sleep 2500
+h
+// P0.OUT: bit12(RESET)/bit17(CS) 가 1 이면 펌웨어 GPIO init 실행됨
+mem32 0x50000504, 1
+// P0.DIR
+mem32 0x50000514, 1
+// g_chipid, g_adiid[0..3]
+mem32 0x20003c30, 5
+// P0.IN: MISO(P0.14) 현재 레벨 등
+mem32 0x50000510, 1
+qc

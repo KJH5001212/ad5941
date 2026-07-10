@@ -1,0 +1,18 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+h
+// PC/SP 확인 (halt 시점)
+regs
+// 플래시 벡터테이블: [0]=initial SP(0x2000xxxx 기대), [1]=reset vector
+mem32 0x00000000, 4
+// 리셋 후 실행 재시도
+r
+g
+Sleep 3000
+h
+regs
+mem32 0x50000514, 1
+mem32 0x20003c30, 5
+qc

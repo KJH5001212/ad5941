@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="AD5941 Potentiostat"
+        android:gravity="center"
+        android:textColor="@color/text"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:paddingTop="10dp"
+        android:paddingBottom="8dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingHorizontal="12dp"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="8dp">
+
+            <!-- Device card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/card_bg"
+                android:padding="10dp">
+                <View android:layout_width="48dp" android:layout_height="36dp" android:background="@drawable/device_thumb" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:layout_marginStart="12dp" android:orientation="vertical">
+                    <TextView android:id="@+id/tvDeviceName" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="ad5941" android:textColor="@color/text" android:textStyle="bold" android:textSize="15sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="nRF52832 + AD5941" android:textColor="@color/textDim" android:textSize="11sp" />
+                </LinearLayout>
+                <TextView android:id="@+id/tvConnPill" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:background="@drawable/pill_bg" android:paddingHorizontal="12dp" android:paddingVertical="6dp"
+                    android:text="● Disconnected" android:textColor="@color/textDim" android:textSize="12sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Parameters card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:padding="12dp"
+                android:layout_marginTop="8dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Parameters" android:textColor="@color/text" android:textStyle="bold" android:textSize="15sp" />
+
+                <!-- Potential (fixed) -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="10dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="Potential" android:textColor="@color/textDim" android:textSize="14sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="0.50 V  🔒 fixed" android:textColor="@color/text" android:textSize="14sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Autorange -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="10dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="Autorange (start 1 nA)" android:textColor="@color/textDim" android:textSize="14sp" />
+                    <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swAuto"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" />
+                </LinearLayout>
+
+                <!-- Sample rate -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="10dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="Sample rate" android:textColor="@color/textDim" android:textSize="14sp" />
+                    <EditText android:id="@+id/etRate" android:layout_width="72dp" android:layout_height="wrap_content"
+                        android:inputType="number" android:text="10" android:gravity="end"
+                        android:textColor="@color/text" android:textColorHint="@color/textDim" android:textSize="15sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Hz" android:textColor="@color/textDim" android:textSize="13sp" android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <!-- Run mode -->
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Run mode" android:textColor="@color/textDim" android:textSize="14sp" android:layout_marginTop="12dp" />
+                <RadioGroup android:id="@+id/rgMode" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginTop="4dp">
+                    <RadioButton android:id="@+id/rbContinuous" android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Continuous" android:textColor="@color/text" android:textSize="12sp" />
+                    <RadioButton android:id="@+id/rbTimed" android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Timed" android:textColor="@color/text" android:textSize="12sp" />
+                    <RadioButton android:id="@+id/rbCycle" android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Cycle" android:textColor="@color/text" android:textSize="12sp" android:checked="true" />
+                </RadioGroup>
+
+                <!-- Timed field -->
+                <LinearLayout android:id="@+id/rowTimed" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="8dp" android:visibility="gone">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="Duration" android:textColor="@color/textDim" android:textSize="14sp" />
+                    <EditText android:id="@+id/etDur" android:layout_width="90dp" android:layout_height="wrap_content"
+                        android:inputType="number" android:text="60" android:gravity="end"
+                        android:textColor="@color/text" android:textSize="15sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="s" android:textColor="@color/textDim" android:textSize="13sp" android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <!-- Cycle fields -->
+                <LinearLayout android:id="@+id/rowCycle" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginTop="8dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal"
+                        android:background="@drawable/inner_bg" android:padding="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="measure (s)" android:textColor="@color/textDim" android:textSize="11sp" />
+                        <EditText android:id="@+id/etOn" android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:inputType="number" android:text="5" android:gravity="center" android:textColor="@color/text" android:textSize="16sp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal"
+                        android:background="@drawable/inner_bg" android:padding="8dp" android:layout_marginStart="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="rest (s)" android:textColor="@color/textDim" android:textSize="11sp" />
+                        <EditText android:id="@+id/etOff" android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:inputType="number" android:text="295" android:gravity="center" android:textColor="@color/text" android:textSize="16sp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal"
+                        android:background="@drawable/inner_bg" android:padding="8dp" android:layout_marginStart="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="repeat (0=∞)" android:textColor="@color/textDim" android:textSize="11sp" />
+                        <EditText android:id="@+id/etCycles" android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:inputType="number" android:text="0" android:gravity="center" android:textColor="@color/text" android:textSize="16sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnStartStop"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:text="Start" android:textSize="16sp" android:textStyle="bold"
+                    android:layout_marginTop="12dp" app:cornerRadius="12dp"
+                    app:backgroundTint="@color/green" android:textColor="@color/bg" />
+            </LinearLayout>
+
+            <!-- Live card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:padding="12dp"
+                android:layout_marginTop="8dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical">
+                    <TextView android:id="@+id/tvCurrent" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="— nA" android:textColor="@color/text" android:textStyle="bold" android:textSize="30sp" />
+                    <TextView android:id="@+id/tvRange" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:background="@drawable/pill_bg" android:paddingHorizontal="10dp" android:paddingVertical="4dp"
+                        android:text="512kΩ" android:textColor="@color/accent" android:textSize="12sp" />
+                </LinearLayout>
+                <com.example.emgple52.ui.WaveformView android:id="@+id/waveLive"
+                    android:layout_width="match_parent" android:layout_height="200dp" android:layout_marginTop="8dp" />
+            </LinearLayout>
+
+            <!-- Status / sync card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/card_bg"
+                android:padding="12dp"
+                android:layout_marginTop="8dp">
+                <View android:id="@+id/dotState" android:layout_width="8dp" android:layout_height="8dp" android:background="@drawable/dot_gray" />
+                <TextView android:id="@+id/tvState" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:layout_marginStart="8dp" android:text="idle" android:textColor="@color/text" android:textSize="14sp" android:textStyle="bold" />
+                <TextView android:id="@+id/tvSync" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="buffered 0" android:textColor="@color/textDim" android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/cardBorder" />
+
+    <!-- Bottom tab bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/card2"
+        android:paddingVertical="7dp">
+        <LinearLayout android:id="@+id/tabHome" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_home" android:tint="@color/accent" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Home" android:textColor="@color/accent" android:textSize="11sp" android:layout_marginTop="2dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tabDevice" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_device" android:tint="@color/textDim" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Device" android:textColor="@color/textDim" android:textSize="11sp" android:layout_marginTop="2dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tabRecord" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView android:id="@+id/imgRecord" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_record" android:tint="@color/textDim" />
+            <TextView android:id="@+id/lblRecord" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Record" android:textColor="@color/textDim" android:textSize="11sp" android:layout_marginTop="2dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tabReport" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_report" android:tint="@color/textDim" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Export" android:textColor="@color/textDim" android:textSize="11sp" android:layout_marginTop="2dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tabMore" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_more" android:tint="@color/textDim" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Info" android:textColor="@color/textDim" android:textSize="11sp" android:layout_marginTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

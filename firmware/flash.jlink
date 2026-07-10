@@ -1,0 +1,10 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+halt
+erase
+loadfile C:\Users\KIM\Downloads\ad5941_pstat\build\ad5941_pstat\zephyr\zephyr.hex
+r
+g
+qc

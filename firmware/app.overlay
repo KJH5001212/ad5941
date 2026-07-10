@@ -1,0 +1,70 @@
+/*
+ * ============================================================
+ *  AD5941 <-> nRF52832 배선 정의  (실제 PCB 스키매틱 기준 확정)
+ *  ------------------------------------------------------------
+ *  AD5941 신호      넷          nRF52832 핀    비고
+ *  ---------------  ----------  ------------   ----------------------
+ *  SCLK    (pin16)  AD_SCLK     P0.16          SPI clock (<=8MHz on nRF)
+ *  MOSI    (pin17)  AD_MOSI     P0.15          nRF -> AD5941 (SDI)
+ *  MISO    (pin18)  AD_MISO     P0.14          AD5941 -> nRF (SDO)
+ *  CS      (pin15)  AD_CS       P0.17          active-low, 펌웨어가 수동 토글
+ *  RESET   (pin22)  AD_RESET    P0.12          active-low 하드웨어 리셋
+ *  INT/GPIO0(pin19) AD_INT0     P0.13          AD5941 인터럽트 출력(active-low)
+ *
+ *  전극: CE0(47)=상대, RE0(48)=기준, SE0(45)=작업(WE). VBIAS0/VZERO0 연결, DE0 DNP.
+ *  AD5941 XTALO(12) 미연결 -> 내부 오실레이터 사용 (펌웨어도 내부 osc 가정).
+ *  주의: AD5941 SPI 는 최대 16MHz 지만 nRF52832 SPIM 은 8MHz 가 상한.
+ * ============================================================
+ */
+
+#include <zephyr/dt-bindings/regulator/nrf5x.h>
+
+/*
+ * 전원 레귤레이터: LDO 모드 강제.
+ * (DK 정의는 DC/DC 를 켜는데, DCC 핀에 외부 인덕터가 없는 커스텀 보드에서
+ *  DC/DC 가 켜지면 레일이 무너짐. LDO 는 인덕터 없이 항상 동작.)
+ */
+&reg {
+	regulator-initial-mode = <NRF5X_REG_MODE_LDO>;
+};
+
+&pinctrl {
+	spi2_default: spi2_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 16)>,   /* SCLK : P0.16 */
+				<NRF_PSEL(SPIM_MOSI, 0, 15)>,  /* MOSI : P0.15 */
+				<NRF_PSEL(SPIM_MISO, 0, 14)>;  /* MISO : P0.14 */
+		};
+	};
+
+	spi2_sleep: spi2_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 16)>,
+				<NRF_PSEL(SPIM_MOSI, 0, 15)>,
+				<NRF_PSEL(SPIM_MISO, 0, 14)>;
+			low-power-enable;
+		};
+	};
+};
+
+&spi2 {
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi2_default>;
+	pinctrl-1 = <&spi2_sleep>;
+	pinctrl-names = "default", "sleep";
+	/* CS 는 여기 cs-gpios 로 두지 않는다: ad5940 라이브러리가 멀티바이트
+	 * 전송 한 프레임 안에서 CS 를 직접 토글하므로, 드라이버가 CS 를 건드리면
+	 * 프로토콜이 깨진다. -> CS 는 아래 zephyr,user 의 GPIO 로 수동 제어. */
+};
+
+/ {
+	zephyr,user {
+		/* CS/RESET: ACTIVE_HIGH 로 선언해 포트가 물리 레벨을 직접 구동
+		 * (AD5940_CsClr=물리 LOW=선택, AD5940_CsSet=물리 HIGH=해제 의미와 일치). */
+		cs-gpios    = <&gpio0 17 GPIO_ACTIVE_HIGH>;  /* CS_N    : P0.17 */
+		reset-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;  /* RESET_N : P0.12 */
+		/* INT 는 AD5941 GP0 인터럽트 출력이 active-low. */
+		int-gpios   = <&gpio0 13 GPIO_ACTIVE_LOW>;   /* INT     : P0.13 */
+	};
+};
