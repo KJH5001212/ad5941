@@ -1,0 +1,7 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+r
+g
+qc

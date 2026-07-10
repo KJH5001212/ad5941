@@ -1,0 +1,10 @@
+si SWD
+speed 1000
+device NRF52832_XXAA
+connect
+h
+regs
+mem32 0x20003498, 1
+mem32 0x20003464, 1
+g
+qc

@@ -75,9 +75,15 @@ class WaveformView @JvmOverloads constructor(
 
         var range = fixedRange
         if (range <= 0f) {
-            range = 1e-9f
-            for (v in snapshot) range = max(range, abs(v))
-            range *= 1.2f
+            // Robust auto-scale: 98th percentile of |v| so a large initial
+            // chronoamperometry transient doesn't flatten the rest of the trace.
+            if (n > 0) {
+                val mags = FloatArray(n) { abs(snapshot[it]) }
+                mags.sort()
+                range = max(1e-9f, mags[((n - 1) * 0.98f).toInt()]) * 1.25f
+            } else {
+                range = 1e-9f
+            }
         }
 
         if (showGrid) {

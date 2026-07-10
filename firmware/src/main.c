@@ -366,7 +366,7 @@ static void run_once(void)
 
 	atomic_set(&g_state, PSTAT_IDLE);
 	status_req = true;   /* 종료 즉시 통지 */
-	ble_set_fast(false);
+	ble_set_fast(false);   /* 유휴=저전력 느린 간격 (전원 마진 확보) */
 	LOG_INF("run finished (cycles=%u)", run_cycle);
 }
 
@@ -377,7 +377,8 @@ static void meas_thread(void)
 		k_sem_take(&start_sem, K_FOREVER);
 		if (g_adiid[0] != AD5940_ADIID) {
 			LOG_ERR("AFE 미확인 — start 거부");
-			atomic_set(&g_state, PSTAT_IDLE);   /* CMD_START 의 CAS 롤백 */
+			atomic_set(&g_state, PSTAT_IDLE);
+			status_req = true;
 			continue;
 		}
 		k_mutex_lock(&cfg_lock, K_FOREVER);
@@ -386,8 +387,6 @@ static void meas_thread(void)
 		if (rc.rate_hz == 0) {
 			rc.rate_hz = 1;   /* 0 나눗셈 방어 */
 		}
-		/* stop_req 는 CMD_START(수락 시점)에서만 클리어 —
-		 * 수락~여기 사이 도착한 STOP 이 보존되어 즉시 종료됨 */
 		LOG_INF("START mode=%u rate=%uHz auto=%d dur=%us on=%us off=%us cyc=%u",
 			rc.mode, rc.rate_hz, (int)rc.autorange,
 			rc.duration_s, rc.on_s, rc.off_s, rc.cycles);
@@ -460,7 +459,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	mtu_exchange_params.func = mtu_exchange_cb;
 	bt_gatt_exchange_mtu(conn, &mtu_exchange_params);
 
-	/* 재연결: 미ACK분 처음부터 재전송. 실행중이면 빠른 간격. */
+	/* 재연결: 미ACK분 처음부터 재전송. 실행중이면 빠른 간격, 유휴면 느린 간격(저전력). */
 	databuf_rewind_unsent();
 	ble_set_fast(atomic_get(&g_state) == PSTAT_RUN);
 }
@@ -515,15 +514,12 @@ static void nus_received(struct bt_conn *conn, const uint8_t *data, uint16_t len
 		k_mutex_lock(&cfg_lock, K_FOREVER);
 		g_cfg = c.cfg;
 		k_mutex_unlock(&cfg_lock);
-		/* IDLE->RUN 원자 전이로 수락. 이 시점부터 state=RUN 이므로
-		 * 이후 도착하는 STOP 의 stop_req 가 절대 유실되지 않음.
-		 * (stop_req 클리어는 여기서만 — meas_thread 는 클리어 안함) */
 		if (atomic_cas(&g_state, PSTAT_IDLE, PSTAT_RUN)) {
 			stop_req = false;
 			k_sem_give(&start_sem);
 			LOG_INF("cmd: start");
 		} else {
-			LOG_WRN("cmd: start 무시 (이미 실행중, stop 먼저)");
+			LOG_WRN("cmd: start 무시 (이미 실행중 — stop 먼저)");
 		}
 		break;
 	case CMD_STATUS:

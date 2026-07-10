@@ -55,6 +55,11 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
     private var lastAckMs = 0L
     private var recStartMs = 0L
     private var startedAtMs = 0L   // when Start was tapped (grace before trusting "idle")
+    // ---- BLE receive diagnostics (shown on screen to localize any data-path issue) ----
+    private var rxNotifs = 0L      // notifications received
+    private var rxBytes = 0L       // total bytes received
+    private var rxSamples = 0L     // samples successfully parsed
+    private var lastRxLogMs = 0L   // throttle for RX timing log
 
     private val rangeLabels = arrayOf(
         "512kΩ", "256kΩ", "128kΩ", "64kΩ", "32kΩ", "16kΩ", "8kΩ", "4kΩ", "2kΩ", "1kΩ", "110Ω"
@@ -175,6 +180,7 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
         if (connected) {
             scanDialog?.dismiss()
             parser.reset()
+            rxNotifs = 0; rxBytes = 0; rxSamples = 0
             b.waveLive.clearData()
             deviceName?.let { b.tvDeviceName.text = it }
             b.tvConnPill.text = "● Connected"
@@ -192,14 +198,26 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
     }
 
     override fun onNotifyReady(uuid: String) {
-        // request initial status once streaming path is up
+        // Ask the phone for a fast connection interval right away. Otherwise the
+        // link sits at the slow (idle) interval and data arrives in a big burst
+        // ~10 s in (after the interval finally speeds up) — the "batched" delay.
+        ble.requestHighPriority(true)
         ui.postDelayed({ if (ble.canSend()) ble.send("{\"cmd\":\"status\"}".toByteArray()) }, 300)
     }
 
     override fun onDataReceived(bytes: ByteArray) {
+        rxBytes += bytes.size
+        rxNotifs++
         val samples = parser.feed(bytes)
-        if (samples.isEmpty()) return
-        synchronized(lock) { pending.addAll(samples) }
+        if (samples.isNotEmpty()) {
+            rxSamples += samples.size
+            synchronized(lock) { pending.addAll(samples) }
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRxLogMs >= 1000) {
+            lastRxLogMs = now
+            android.util.Log.d("BLE", "RXTIME rxSamples=$rxSamples rxNotifs=$rxNotifs")
+        }
     }
 
     override fun onLog(message: String) { android.util.Log.d("BLE", message) }
@@ -254,8 +272,12 @@ class MainActivity : AppCompatActivity(), BleManager.Listener {
                 else -> "idle"
             }
             b.dotState.setBackgroundResource(if (st == "run") R.drawable.dot_green else R.drawable.dot_gray)
-            val sync = if (parser.buf > 0) "syncing ${parser.buf}" else "buffered ${parser.pend}"
-            b.tvSync.text = if (parser.gap) "$sync  ⚠ gap" else sync
+            // DIAGNOSTIC: shows exactly where the data path stands.
+            //   notif=0            -> notifications not arriving (BLE notify setup)
+            //   notif>0 samp=0     -> arriving but not parsed (frame/format)
+            //   samp>0             -> received & parsed OK (any issue is display)
+            b.tvSync.text = "notif=$rxNotifs samp=$rxSamples tx=${ble.writesDone}/${ble.writesIssued} " +
+                "cs=${ble.canSend()} mtu=${ble.currentMtu()}"
         }
 
         if (recorder.recording) {
