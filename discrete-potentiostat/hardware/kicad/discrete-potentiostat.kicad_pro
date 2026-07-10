@@ -1,0 +1,13 @@
+{
+  "board": { "design_settings": {} },
+  "libraries": { "pinned_footprint_libs": [], "pinned_symbol_libs": [] },
+  "meta": { "filename": "discrete-potentiostat.kicad_pro", "version": 1 },
+  "schematic": {
+    "annotate_start_num": 0,
+    "drawing": { "default_line_thickness": 6.0, "default_text_size": 50.0 },
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [],
+  "text_variables": {}
+}
