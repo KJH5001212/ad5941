@@ -12,7 +12,7 @@
 | U3 | nRF52832-QFAA | QFN48 6×6 (칩다운) | MCU + BLE + SAADC |
 | Y1 | 수정 32 MHz, CL 8 pF, ±10 ppm | 3225 | HFXO (BLE 필수) |
 | FL1 | Johanson 2450FM07A0029 | 0402 4-pin | nRF52 전용 임피던스 매칭 LPF (디스크리트 매칭 대체) |
-| E1 | Johanson 2450AT18B0100001E | 3.2×1.6 | 2.4 GHz 칩 안테나 |
+| E1 | Johanson 2450AT07A0100 | **1.0×0.5×0.37 mm (0402)** | 2.4 GHz 마이크로 칩 안테나 — 데이터시트 킵아웃 엄수, R15/C34로 실보드 튜닝 |
 | U4 | OPA2391DGKR | VSSOP-8 | A: 컨트롤 앰프 / B: TIA |
 | U5 | REF35102QDBVR | SOT-23-6 | 1.024 V 레퍼런스 |
 | BT1 | LIR2032 + SMD 홀더 (Keystone 3034 등) | — | 3.7 V / ~40 mAh (보호회로 없음 — 펌웨어 컷오프 필수) |
