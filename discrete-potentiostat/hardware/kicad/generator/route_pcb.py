@@ -437,10 +437,13 @@ def connected_components(name):
     return todo_pads
 
 # 1) route all signal/power nets first --------------------------------------
+_PRI = [s for s in os.environ.get('PRIORITY', '').split(',') if s]
+
 def net_order(item):
     name, pads = item
     xs = [p['x'] for p in pads]; ys = [p['y'] for p in pads]
-    return (-len(pads), (max(xs)-min(xs)) + (max(ys)-min(ys)))
+    pri = _PRI.index(name) - len(_PRI) if name in _PRI else 0
+    return (pri, -len(pads), (max(xs)-min(xs)) + (max(ys)-min(ys)))
 
 pad_stub = {}      # (ref,num) -> set of extra start cells (stub + via, both layers)
 
