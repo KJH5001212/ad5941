@@ -2,10 +2,12 @@
 """Placement checks without touching risky bbox APIs."""
 import pcbnew
 from pcbnew import ToMM
+import os as _os
+board = pcbnew.LoadBoard(_os.environ.get('PCB_FILE',os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'discrete-potentiostat.kicad_pcb'))))
 import os
-PCB = os.environ.get('PCB_FILE', os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'discrete-potentiostat.kicad_pcb')))
-board = pcbnew.LoadBoard(PCB)
-BX, BY, BW, BH = 100.0, 100.0, 26.0, 24.0
+BX, BY = 100.0, 100.0
+BW = float(os.environ.get('BOARD_W', '26.0'))
+BH = float(os.environ.get('BOARD_H', '24.0'))
 items = []
 for fp in board.GetFootprints():
     ref = fp.GetReference()
@@ -17,7 +19,7 @@ for fp in board.GetFootprints():
         ys += [ToMM(bb.GetTop()) - BY, ToMM(bb.GetBottom()) - BY]
     if not xs: continue
     items.append((ref, side, min(xs), min(ys), max(xs), max(ys)))
-CELL = (13.0, 12.5, 10.5)
+CELL = tuple(float(v) for v in os.environ.get('CELL', '13.0,12.5,10.5').split(','))
 for ref, side, x0, y0, x1, y1 in items:
     if side == 'B' and ref != 'BT1':
         cx, cy, cr = CELL

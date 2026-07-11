@@ -12,13 +12,15 @@ import pcbnew
 from pcbnew import VECTOR2I, FromMM, ToMM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.environ.get('PCB_FILE', os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'discrete-potentiostat.kicad_pcb')))
-BX, BY, BW, BH = 100.0, 100.0, 26.0, 24.0
+PCB = os.environ.get('PCB_FILE', os.path.abspath(os.path.join(HERE, '..', 'discrete-potentiostat.kicad_pcb')))
+BX, BY = 100.0, 100.0
+BW = float(os.environ.get('BOARD_W', '26.0'))
+BH = float(os.environ.get('BOARD_H', '24.0'))
 STEP = 0.05                     # routing grid (mm)
 NX, NY = int(BW/STEP)+1, int(BH/STEP)+1
 EDGE = 0.35                     # copper-to-edge margin
 VIA_D, VIA_DRILL = 0.4, 0.2
-KEEP = (21.0, -1.0, 26.5, 3.2)  # antenna keepout
+KEEP = (BW-5.0, -1.0, BW+0.5, 3.2)  # antenna keepout (5mm corner)
 POWER = {'3V3', '+BATT', 'V5OUT', 'AFE_PWR', 'RECT', 'COIL', 'AC1', 'AC2'}
 W_SIG, W_PWR = 0.10, 0.20
 CLR = 0.10
@@ -26,9 +28,10 @@ CLR = 0.10
 board = pcbnew.LoadBoard(PCB)
 F, B = pcbnew.F_Cu, pcbnew.B_Cu
 IN2, IN3 = pcbnew.In2_Cu, pcbnew.In3_Cu
-LAYERS = [F, IN2, IN3, B]
+L4 = os.environ.get('LAYERS4') == '1'
+LAYERS = [F, IN2, B] if L4 else [F, IN2, IN3, B]
 NL = len(LAYERS)
-LI_OF = {F: 0, IN2: 1, IN3: 2, B: 3}
+LI_OF = {L: i for i, L in enumerate(LAYERS)}
 
 def mm_pt(p):  # absolute -> board-relative mm
     return ToMM(p.x) - BX, ToMM(p.y) - BY
@@ -504,8 +507,9 @@ todo = [(n, ps) for n, ps in pads_by_net.items()
         and n not in ('ANT', 'ANT50', 'ANT_FEED')]
 import json as _json
 _OVR = None
-if RESUME and os.path.exists(os.path.join(HERE, 'todo_override.json')):
-    _OVR = _json.load(open(os.path.join(HERE, 'todo_override.json')))
+_TODO = os.environ.get('TODO_FILE', os.path.join(HERE, 'todo_override.json'))
+if RESUME and os.path.exists(_TODO):
+    _OVR = _json.load(open(_TODO))
     print('todo override:', {k: len(v) for k, v in _OVR.items()})
 for name, pads in todo:
     if _OVR is not None:

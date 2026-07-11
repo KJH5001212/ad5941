@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Generate discrete-potentiostat.kicad_pcb (KiCad 7, pcbnew API).
 
-26 x 24 mm 6-layer board, double-sided placement (ICs on top, passives on
-the back ring outside the LIR2032 battery zone). Placement + zones +
-antenna keepout + RF feed pre-route; run route_pcb.py afterwards for full
-auto-routing (then route_loop.sh to converge the remainder).
+23.4 x 22 mm 6-layer RevC, double-sided (ICs top, small passives in the
+back corner pockets outside the LIR2032 zone). LAYERS4=1 env generates the
+4-layer experiment variant (does not route to completion at this density).
+Placement + zones + keepout + RF pre-route (drawn after legalize);
+run route_pcb.py + route_loop.sh afterwards; close4.py holds the final
+hand-routed links for THIS placement revision.
 Origin: board top-left at (100,100) mm absolute.
 """
 import os, re, sys
@@ -12,11 +14,12 @@ import pcbnew
 from pcbnew import VECTOR2I, FromMM, ToMM
 
 GEN = os.path.dirname(os.path.abspath(__file__))
-GEN = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get('PCB_OUT', os.path.abspath(os.path.join(GEN, '..')))
 FPLIB = '/usr/share/kicad/footprints'
 BX, BY = 100.0, 100.0      # board origin (top-left)
-BW, BH = 26.0, 24.0        # board size (+2mm for routability, user-approved)
+BW, BH = 23.4, 22.0        # RevC compact: width floor = battery tabs, height = cell zone
+L4 = os.environ.get('LAYERS4') == '1'   # 4-layer experiment variant
+BCX, BCY = 11.7, 11.25     # battery cell center (back)
 
 def MM(x, y):
     return VECTOR2I(FromMM(BX + x), FromMM(BY + y))
@@ -82,7 +85,7 @@ for sec in tree:
 # ------------------------------------------------------------------ board ---
 board = pcbnew.BOARD()
 ds = board.GetDesignSettings()
-ds.SetCopperLayerCount(6)
+ds.SetCopperLayerCount(4 if L4 else 6)
 ds.m_TrackMinWidth = FromMM(0.09)
 ds.m_ViasMinSize = FromMM(0.4)
 ds.m_MinThroughDrill = FromMM(0.2)
@@ -148,56 +151,58 @@ def make_custom(name):
 # --------------------------------------------------------------- placement ---
 # (ref, x, y, rot_deg, flip)
 PLACE = [
-    # --- Qi charger, top-left ---
+    # --- Qi charger, top-left (unchanged block) ---
     ('U1',  3.7,  7.0,   0, False),
-    ('C1',  2.4,  1.7,   0, False), ('C2', 6.0, 1.4, 0, False),
+    ('C1',  2.65, 2.15,  0, False), ('C2', 6.0, 1.4, 0, False),
     ('C7',  8.4,  1.8,  90, False), ('C8', 9.8, 1.8, 90, False),
     ('C3',  7.7,  4.4,  90, False), ('C4', 9.1, 4.4, 90, False), ('C5', 10.5, 4.4, 90, False),
     ('C6',  7.7,  6.4,  90, False), ('C9', 9.3, 6.6, 90, False),
-    ('R1',  7.0,  2.0,  90, True), ('R2', 8.5, 2.0, 90, True), ('TH1', 9.9, 1.4, 90, True),
     ('L1',  1.2, 14.0,   0, False),
     # --- 5V rail parts, top strip ---
     ('C10',11.2,  1.7,  90, False), ('C11',12.3, 1.6, 90, False),
-    ('R4', 19.5,  2.5,  90, True),
     ('C27',11.6,  4.6,  90, False),
-    # --- crystal ---
-    ('Y1', 15.0,  3.9,   0, False),
-    ('C32',12.5,  3.8,  90, False), ('C33',17.7, 3.8, 90, False),
+    # --- crystal (shifted left with U3) ---
+    ('Y1', 14.6,  3.9,   0, False),
+    ('C32',12.6,  3.8,  90, False), ('C33',15.6, 5.75, 0, False),
     # --- LDO ---
-    ('U2', 11.6,  8.9, 180, False),
-    ('C12',10.0, 11.3,   0, False), ('C13',12.2, 11.3, 0, False), ('C14',13.9, 11.9, 90, False),
-    # --- nRF52832 ---
-    ('U3', 18.6, 10.2,  90, False),
-    ('C25',15.6, 16.0,  90, False), ('C30',16.9, 15.9, 90, False), ('C31',18.2, 15.9, 90, False),
-    ('C26',23.2,  7.6,  90, False), ('C28',23.2, 9.4, 90, False), ('C29',23.2, 11.2, 90, False),
-    ('L2', 21.6, 16.2,  90, False), ('L3', 22.9, 13.4, 90, False),
-    # --- RF corner (keepout x21..26, y0..3.2) ---
-    ('FL1',19.6,  4.0,   0, False),
-    ('C35',20.7,  4.9,  90, False),
-    ('R15',21.7,  4.0,   0, False),
-    ('C34',23.2,  4.9,  90, False),
-    ('E1', 24.3,  1.6,   0, False),
-    # --- SWD, charger IC, LED (bottom-right) ---
-    ('J2', 24.5, 19.4,  90, True),
-    ('U6', 18.6, 21.9,   0, False),
-    ('R3', 20.7, 21.8,  90, True),
-    ('D1', 21.4, 22.6,   0, False), ('R14',23.0, 22.6, 0, False),
+    ('U2', 11.4,  8.9, 180, False),
+    ('C12', 9.4, 11.3,   0, False), ('C13',10.8, 11.3, 0, False), ('C14', 8.8, 12.7, 90, False),
+    # --- nRF52832 (shifted left ~1.8) ---
+    ('U3', 16.8, 10.0,  90, False),
+    ('C25',13.4, 16.4,  90, False), ('C30',14.7, 16.3, 90, False), ('C31',16.0, 16.3, 90, False),
+    ('C26',21.1,  7.6,  90, False), ('C28',21.1, 9.4, 90, False), ('C29',21.1, 11.2, 90, False),
+    ('L2', 12.6, 13.2,  90, False), ('L3', 14.0, 14.6, 0, False),
+    # --- RF corner (keepout x18.4..23.4, y0..3.2) ---
+    ('FL1',17.7,  4.0,   0, False),
+    ('C35',18.8,  4.9,  90, False),
+    ('R15',19.8,  4.0,   0, False),
+    ('C34',21.3,  4.9,  90, False),
+    ('E1', 22.3,  1.6,   0, False),
+    # --- SWD pads + test points: front right column (battery-free side) ---
+    ('J2', 22.4, 10.6,  90, False),
+    ('TP1',22.3, 16.0,   0, False), ('TP2',22.3, 17.8, 0, False), ('TP3',22.3, 19.6, 0, False),
+    # --- charger IC, LED (bottom-right front) ---
+    ('U6', 17.0, 20.4,   0, False),
+    ('D1', 19.2, 20.9,   0, False), ('R14',21.0, 20.9, 0, False),
     # --- AFE, bottom-left ---
     ('U5',  4.6, 15.6,   0, False),
     ('C16', 7.4, 15.0,  90, False), ('C17', 8.3, 15.0, 90, False),
     ('C18', 9.4, 15.1,  90, False), ('C19',10.5, 15.0, 90, False),
-    ('R7', 11.4, 15.0,  90, False), ('R8', 12.3, 15.0, 90, False), ('C20',13.2, 15.0, 90, False),
-    ('U4',  5.0, 20.0,   0, False),
-    ('R10', 2.4, 18.0,  90, True), ('C21', 2.4, 19.7, 90, True),
-    ('R9',  9.2, 18.4,   0, False),
-    ('R11', 9.8, 19.6,   0, False), ('C22', 9.8, 20.8, 0, False),
-    ('R12',12.0, 18.2,  90, False), ('C23',12.9, 18.2, 90, False),
-    ('R13',12.0, 20.2,  90, False), ('C24',12.9, 20.2, 90, False),
-    ('TP1',14.8, 18.2,   0, False), ('TP2',14.8, 20.0, 0, False), ('TP3',14.8, 21.8, 0, False),
-    ('J1',  5.4, 23.0,   0, False),
-    ('R5',  2.5, 21.5,  90, True), ('R6', 3.7, 21.5, 90, True), ('C15', 4.9, 21.5, 90, True),
+    ('R7', 11.4, 15.0,  90, False), ('R8', 12.3, 15.0, 90, False), ('C20',13.2, 15.65, 90, False),
+    ('U4',  5.0, 18.6,   0, False),
+    ('R9',  9.2, 17.6,   0, False),
+    ('R11', 9.8, 18.8,   0, False), ('C22', 9.8, 20.0, 0, False),
+    ('R12',12.0, 17.4,  90, False), ('C23',12.9, 17.4, 90, False),
+    ('R13',12.0, 19.2,  90, False), ('C24',12.9, 19.2, 90, False),
+    ('J1',  5.4, 21.0,   0, False),
+    ('R10',14.6, 17.2,  90, False), ('C21',14.6, 19.4, 90, False),
+    # --- back side: corner pockets outside the battery circle ---
+    ('R1',  2.2,  1.5,  90, True), ('R2', 3.2, 1.5, 90, True), ('TH1', 4.2, 1.5, 90, True),
+    ('R4', 19.5, 18.5,   0, False),
+    ('R3', 20.5, 20.5,  90, True),
+    ('R5',  1.9, 20.9,  90, True), ('R6', 2.75, 20.9, 90, True), ('C15', 3.7, 20.9, 90, True),
     # --- back side: tab-welded cell ---
-    ('BT1',13.0, 12.5,   0, True),
+    ('BT1', 11.7, 11.25, 0, True),
 ]
 
 FP_OVERRIDE = {
@@ -281,13 +286,17 @@ def gnd_zone(layer):
     z.SetMinThickness(FromMM(0.2))
     board.Add(z)
 
-for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In4_Cu, pcbnew.B_Cu):
+ZONE_LAYERS = (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.B_Cu) if L4 else \
+              (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In4_Cu, pcbnew.B_Cu)
+for layer in ZONE_LAYERS:
     gnd_zone(layer)
 
 # antenna keepout: no copper pours / no vias on all layers; tracks allowed
 kz = pcbnew.ZONE(board)
 ls = pcbnew.LSET()
-for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu):
+CU_LAYERS = (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu) if L4 else \
+            (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu)
+for layer in CU_LAYERS:
     ls.AddLayer(layer)
 kz.SetLayerSet(ls)
 kz.SetIsRuleArea(True)
@@ -296,30 +305,9 @@ kz.SetDoNotAllowVias(True)
 kz.SetDoNotAllowTracks(False)
 kz.SetDoNotAllowPads(False)
 kz.SetDoNotAllowFootprints(False)
-kz.Outline().AddOutline(poly_chain([(21.0, -0.5), (BW + 0.5, -0.5), (BW + 0.5, 3.2), (21.0, 3.2)]))
+kz.Outline().AddOutline(poly_chain([(18.4, -0.5), (BW + 0.5, -0.5), (BW + 0.5, 3.2), (18.4, 3.2)]))
 kz.SetZoneName('ANT_KEEPOUT')
 board.Add(kz)
-
-# ---------------------------------------------------------- RF feed traces ---
-def pad_pos(ref, num):
-    return placed[ref].FindPadByNumber(num).GetPosition()
-
-def track(p1, p2, width=0.35, layer=pcbnew.F_Cu, netname='ANT'):
-    t = pcbnew.PCB_TRACK(board)
-    t.SetStart(p1); t.SetEnd(p2)
-    t.SetWidth(FromMM(width))
-    t.SetLayer(layer)
-    t.SetNetCode(nets[netname].GetNetCode())
-    board.Add(t)
-
-try:
-    track(pad_pos('U3', '30'), pad_pos('FL1', '1'), netname='ANT')
-    track(pad_pos('FL1', '3'), pad_pos('C35', '1'), netname='ANT50')
-    track(pad_pos('C35', '1'), pad_pos('R15', '1'), netname='ANT50')
-    track(pad_pos('R15', '2'), pad_pos('C34', '1'), netname='ANT_FEED')
-    track(pad_pos('C34', '1'), pad_pos('E1', '1'), netname='ANT_FEED')
-except Exception as e:
-    print('RF preroute skipped:', e)
 
 # ------------------------------------------------------------------- texts ---
 def text(s, x, y, layer, size=0.8):
@@ -331,8 +319,8 @@ def text(s, x, y, layer, size=0.8):
     t.SetTextThickness(FromMM(size * 0.15))
     board.Add(t)
 
-text('ANT KEEPOUT 5x3\nNO COPPER ALL LAYERS', 23.5, 1.6, pcbnew.Dwgs_User, 0.5)
-text('discrete-potentiostat 26x24 RevB', 13, 11.0, pcbnew.F_SilkS, 0.7)
+text('ANT KEEPOUT 5x3\nNO COPPER ALL LAYERS', 20.9, 1.6, pcbnew.Dwgs_User, 0.5)
+text('discrete-potentiostat 23x22 RevC' + (' 4L' if L4 else ' 6L'), 11.7, 11.0, pcbnew.F_SilkS, 0.7)
 text('coil 20x20 under battery,\nleads to L1 pads', 4.5, 10.5, pcbnew.Cmts_User, 0.5)
 
 # battery cell zone on back (no components inside)
@@ -340,13 +328,13 @@ import math as _m
 for k in range(36):
     a1, a2 = 2*_m.pi*k/36, 2*_m.pi*(k+1)/36
     s2 = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
-    s2.SetStart(MM(13.0+10.5*_m.cos(a1), 12.5+10.5*_m.sin(a1)))
-    s2.SetEnd(MM(13.0+10.5*_m.cos(a2), 12.5+10.5*_m.sin(a2)))
+    s2.SetStart(MM(BCX+10.5*_m.cos(a1), BCY+10.5*_m.sin(a1)))
+    s2.SetEnd(MM(BCX+10.5*_m.cos(a2), BCY+10.5*_m.sin(a2)))
     s2.SetLayer(pcbnew.Cmts_User); s2.SetWidth(FromMM(0.08))
     board.Add(s2)
 
 # coil outline reference on drawings layer (stack position, shifted away from RF corner)
-for (x1, y1, x2, y2) in [(0.5, 3.0, 20.5, 3.0), (20.5, 3.0, 20.5, 23.0), (20.5, 23.0, 0.5, 23.0), (0.5, 23.0, 0.5, 3.0)]:
+for (x1, y1, x2, y2) in [(0.5, 1.9, 20.5, 1.9), (20.5, 1.9, 20.5, 21.9), (20.5, 21.9, 0.5, 21.9), (0.5, 21.9, 0.5, 1.9)]:
     s = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
     s.SetStart(MM(x1, y1)); s.SetEnd(MM(x2, y2))
     s.SetLayer(pcbnew.Cmts_User); s.SetWidth(FromMM(0.08))
@@ -356,7 +344,7 @@ for (x1, y1, x2, y2) in [(0.5, 3.0, 20.5, 3.0), (20.5, 3.0, 20.5, 23.0), (20.5, 
 # ------------------------------------------------------------ legalization ---
 FROZEN = {'U1','U2','U3','U4','U5','U6','Y1','FL1','E1','J1','J2','L1','BT1',
           'TP1','TP2','TP3'}
-KEEPOUT = (19.0, -1.0, 24.5, 3.2)   # x0,y0,x1,y1 — movables must stay out
+KEEPOUT = (18.0, -1.0, BW + 0.5, 3.2)   # x0,y0,x1,y1 — movables must stay out
 
 def fp_bbox(fp):
     xs, ys = [], []
@@ -418,6 +406,49 @@ def legalize(rounds=2000, clearance=0.22, edge=0.45):
         print('legalizer hit round limit')
 
 legalize()
+
+# ---------------------------------------------------------- RF feed traces ---
+def pad_pos(ref, num):
+    return placed[ref].FindPadByNumber(num).GetPosition()
+
+def track(p1, p2, width=0.35, layer=pcbnew.F_Cu, netname='ANT'):
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(p1); t.SetEnd(p2)
+    t.SetWidth(FromMM(width))
+    t.SetLayer(layer)
+    t.SetNetCode(nets[netname].GetNetCode())
+    board.Add(t)
+
+def rel(p):
+    return (ToMM(p.x) - BX, ToMM(p.y) - BY)
+
+def path(netname, pts, width):
+    for i in range(len(pts) - 1):
+        track(MM(*pts[i]), MM(*pts[i+1]), width=width, netname=netname)
+
+try:
+    # clearance-validated geometry (RevB copper_fix pattern):
+    # ANT: down U3.30, approach FL1.1 from south, clear of GND pad row above
+    ax, ay = rel(pad_pos('U3', '30'))
+    f1x, f1y = rel(pad_pos('FL1', '1'))
+    path('ANT', [(ax+0.05, ay), (ax+0.05, f1y+0.45), (f1x-0.2, f1y+0.25),
+                 (f1x, f1y+0.25), (f1x, f1y+0.05)], 0.2)
+    # ANT50: south out of FL1.3, east between C35 pads, north into R15.1
+    f3x, f3y = rel(pad_pos('FL1', '3'))
+    c5x, c5y = rel(pad_pos('C35', '1'))
+    r1x, r1y = rel(pad_pos('R15', '1'))
+    path('ANT50', [(f3x, f3y), (f3x, f3y+0.75), (r1x-0.165, f3y+0.75),
+                   (r1x-0.165, r1y+0.5), (r1x, r1y+0.32)], 0.15)
+    path('ANT50', [(c5x, c5y), (c5x, f3y+0.75)], 0.15)
+    # ANT_FEED: R15.2 diag to C34.1, then east of C34.2 south into E1.1
+    r2 = rel(pad_pos('R15', '2')); c4 = rel(pad_pos('C34', '1'))
+    e1x, e1y = rel(pad_pos('E1', '1'))
+    path('ANT_FEED', [r2, c4], 0.35)
+    path('ANT_FEED', [c4, (e1x, c4[1]-0.59), (e1x, e1y)], 0.2)
+except Exception as e:
+    print('RF preroute skipped:', e)
+
+
 
 for ref, num in [('U3','30'),('U3','34'),('U3','35'),('U3','13')]:
     p = placed[ref].FindPadByNumber(num).GetPosition()
