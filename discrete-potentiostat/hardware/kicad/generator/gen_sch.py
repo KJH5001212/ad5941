@@ -336,7 +336,8 @@ def layout():
         '1':'ANT', '2':GND, '3':'ANT50', '4':GND})
     add('R15','Device:R', 336, 245, '0R','Resistor_SMD:R_0402_1005Metric', {'1':'ANT50','2':'ANT_FEED'})
     add('C34','Device:C', 336, 258, 'DNP (tune)','Capacitor_SMD:C_0402_1005Metric', {'1':'ANT_FEED','2':GND}, dnp=True)
-    add('E1','Device:Antenna', 348, 232, '2450AT07A0100','pstat:Johanson_2450AT07A0100', {'1':'ANT_FEED'})
+    add('R16','Device:R', 344, 245, '0R (tune)','Resistor_SMD:R_0402_1005Metric', {'1':'ANT_FEED','2':'ANT_E'})
+    add('E1','Device:Antenna', 352, 232, '2450AT07A0100','pstat:Johanson_2450AT07A0100', {'1':'ANT_E'})
     add('R14','Device:R', 330, 165, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'LED_R','2':'LED_A'})
     add('D1','Device:LED', 330, 180, 'GREEN','LED_SMD:LED_0603_1608Metric', {'1':GND,'2':'LED_A'})
     add('J2','Connector_Generic:Conn_01x05', 340, 220, 'SWD','Connector_PinHeader_1.27mm:PinHeader_1x05_P1.27mm_Vertical', {
@@ -469,7 +470,7 @@ DESIGN NOTES / VERIFY BEFORE LAYOUT
    Retune both whenever the coil changes. Small coil = tighter TX alignment; fine at our 0.13W.
 3. CHIP-DOWN RF: copy Nordic's QFN48 reference layout verbatim (trace geometry included).
    FL1 (Johanson 2450FM07A0029) replaces the discrete LC match for nRF52 single-ended ANT.
-   R15/C34 = antenna tee tuning slots (fit 0R / DNP initially, tune on real board with VNA).
+   R15/C34/R16 = full tee tuning slots per Johanson (series-shunt-series; fit 0R/DNP/0R initially).
    E1 = 0402 micro antenna: keep the datasheet ground keepout exactly; expect finer tuning.
    DEC2, DEC3 unconnected per QFN48 reference; no 32k crystal -> firmware uses LFRC synth.
 4. TS/CTRL: 10k NTC against the LIR2032 holder cuts wireless power if the cell heats
