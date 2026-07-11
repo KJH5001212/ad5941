@@ -34,7 +34,9 @@ V_out, 1.024V → nRF52832 SAADC 차동 입력 → I = ΔV / RF → BLE
 
 - `hardware/design.md` — 회로 상세 설계 + 계산 (바이어스, TIA, SAADC, 충전, 전원, 보호)
 - `hardware/bom.md` — 전체 BOM (수동소자 포함)
-- `firmware-plan.md` — 기존 `firmware/`(AD5941용)에서 재사용/교체할 부분 정리
+- `hardware/kicad/` — 회로도 + 23.4×22 mm 6층 PCB (배선 완료) + 생성기 스크립트
+- `firmware/` — **펌웨어 (SAADC 직접측정, 구현 완료)** — 프로토콜/파라미터는 `firmware/README.md`
+- `firmware-plan.md` — 포팅 계획 원문 (구현 완료 — 이력 참고용)
 
 ## 기존 ad5941 프로젝트와의 관계
 
