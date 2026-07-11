@@ -12,13 +12,13 @@ import pcbnew
 from pcbnew import VECTOR2I, FromMM, ToMM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.environ.get('PCB_FILE', os.path.join(HERE, '..', 'discrete-potentiostat.kicad_pcb'))
-BX, BY, BW, BH = 100.0, 100.0, 24.0, 22.0
+PCB = os.environ.get('PCB_FILE', os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'discrete-potentiostat.kicad_pcb')))
+BX, BY, BW, BH = 100.0, 100.0, 26.0, 24.0
 STEP = 0.05                     # routing grid (mm)
 NX, NY = int(BW/STEP)+1, int(BH/STEP)+1
 EDGE = 0.35                     # copper-to-edge margin
 VIA_D, VIA_DRILL = 0.4, 0.2
-KEEP = (19.0, -1.0, 24.5, 3.2)  # antenna keepout
+KEEP = (21.0, -1.0, 26.5, 3.2)  # antenna keepout
 POWER = {'3V3', '+BATT', 'V5OUT', 'AFE_PWR', 'RECT', 'COIL', 'AC1', 'AC2'}
 W_SIG, W_PWR = 0.10, 0.20
 CLR = 0.10
@@ -52,7 +52,10 @@ for fp in board.GetFootprints():
         on_f = pad.IsOnLayer(F)
         on_b = pad.IsOnLayer(B)
         tht = pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH
+        sz = pad.GetSize()
+        is_circle = pad.GetShape() == pcbnew.PAD_SHAPE_CIRCLE
         rec = dict(net=net, x=x, y=y, rect=rect, f=on_f or tht, b=on_b or tht, tht=tht,
+                   circ=is_circle, pw=ToMM(sz.x), ph=ToMM(sz.y),
                    ref=fp.GetReference(), num=pad.GetNumber())
         all_pads.append(rec)
         pads_by_net.setdefault(net, []).append(rec)
@@ -216,9 +219,18 @@ def via_free(grid, i, j):
     return True
 
 def pad_cells(p, grid, width):
-    """cells inside pad usable as start/target on its layer(s)"""
+    """cells inside the GUARANTEED copper core of the pad (handles round corners)"""
     out = []
     x0, y0, x1, y1 = p['rect']
+    # inset: circles -> inscribed square; rounded rects -> 30% of min dim
+    if p.get('circ'):
+        r = min(p.get('pw', x1-x0), p.get('ph', y1-y0)) / 2
+        ins = r * 0.30
+    else:
+        ins = 0.30 * min(p.get('pw', x1-x0), p.get('ph', y1-y0)) / 2 + 0.02
+    x0, y0, x1, y1 = x0+ins, y0+ins, x1-ins, y1-ins
+    if x1 < x0: x0 = x1 = (x0+x1)/2
+    if y1 < y0: y0 = y1 = (y0+y1)/2
     i0, i1 = int(math.ceil(x0/STEP)), int(x1/STEP)
     j0, j1 = int(math.ceil(y0/STEP)), int(y1/STEP)
     ci, cj = to_cell(p['x'], p['y'])
@@ -397,9 +409,11 @@ def connected_components(name):
         return p1[2] == p2[2] and abs(p1[0]-p2[0]) < 0.12 and abs(p1[1]-p2[1]) < 0.12
     def pad_touch(p, pt):
         x0, y0, x1, y1 = p['rect']
+        ins = 0.30 * min(p.get('pw', x1-x0), p.get('ph', y1-y0)) / 2
+        x0, y0, x1, y1 = x0+ins, y0+ins, x1-ins, y1-ins
         li = 0 if p['f'] else NL-1
         lis = {0, NL-1} if (p['f'] and p['b']) else {li}
-        return pt[2] in lis and x0-0.1 <= pt[0] <= x1+0.1 and y0-0.1 <= pt[1] <= y1+0.1
+        return pt[2] in lis and x0 <= pt[0] <= x1 and y0 <= pt[1] <= y1
     for a in range(len(nodes)):
         for b in range(a+1, len(nodes)):
             ka, _, pa, ra = nodes[a]

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generate discrete-potentiostat.kicad_pcb (KiCad 7, pcbnew API).
 
-24 x 22 mm 4-layer board. Placement + zones + antenna keepout + RF feed
-pre-route; general routing is left for interactive work (ratsnest ready).
+26 x 24 mm 6-layer board, double-sided placement (ICs on top, passives on
+the back ring outside the LIR2032 battery zone). Placement + zones +
+antenna keepout + RF feed pre-route; run route_pcb.py afterwards for full
+auto-routing (then route_loop.sh to converge the remainder).
 Origin: board top-left at (100,100) mm absolute.
 """
 import os, re, sys
@@ -10,10 +12,11 @@ import pcbnew
 from pcbnew import VECTOR2I, FromMM, ToMM
 
 GEN = os.path.dirname(os.path.abspath(__file__))
+GEN = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get('PCB_OUT', os.path.abspath(os.path.join(GEN, '..')))
 FPLIB = '/usr/share/kicad/footprints'
 BX, BY = 100.0, 100.0      # board origin (top-left)
-BW, BH = 24.0, 22.0        # board size
+BW, BH = 26.0, 24.0        # board size (+2mm for routability, user-approved)
 
 def MM(x, y):
     return VECTOR2I(FromMM(BX + x), FromMM(BY + y))
@@ -146,55 +149,55 @@ def make_custom(name):
 # (ref, x, y, rot_deg, flip)
 PLACE = [
     # --- Qi charger, top-left ---
-    ('U1',  3.7,  6.8,   0, False),
-    ('C1',  2.4,  1.6,   0, False), ('C2', 5.6, 1.2, 0, False),
-    ('C7',  7.45, 1.7,  90, False), ('C8', 8.75, 1.7, 90, False),
-    ('C3',  6.9,  3.9,  90, False), ('C4', 8.0, 3.9, 90, False), ('C5', 9.1, 3.9, 90, False),
-    ('C6',  7.05, 5.9,  90, False), ('C9', 8.5, 6.2, 90, False),
-    ('R1',  7.1,  7.9,  90, False), ('R2', 7.1, 9.8, 90, False), ('TH1', 8.2, 9.8, 90, False),
-    ('L1',  1.2, 13.0,   0, False),
+    ('U1',  3.7,  7.0,   0, False),
+    ('C1',  2.4,  1.7,   0, False), ('C2', 6.0, 1.4, 0, False),
+    ('C7',  8.4,  1.8,  90, False), ('C8', 9.8, 1.8, 90, False),
+    ('C3',  7.7,  4.4,  90, False), ('C4', 9.1, 4.4, 90, False), ('C5', 10.5, 4.4, 90, False),
+    ('C6',  7.7,  6.4,  90, False), ('C9', 9.3, 6.6, 90, False),
+    ('R1',  7.0,  2.0,  90, True), ('R2', 8.5, 2.0, 90, True), ('TH1', 9.9, 1.4, 90, True),
+    ('L1',  1.2, 14.0,   0, False),
     # --- 5V rail parts, top strip ---
-    ('C10', 9.55, 1.3,  90, False), ('C11',10.7, 1.3, 90, False),
-    ('R3', 11.65, 1.25, 90, False), ('R4', 12.55, 1.25, 90, False),
-    ('C27',10.25, 4.0,  90, False),
+    ('C10',11.2,  1.7,  90, False), ('C11',12.3, 1.6, 90, False),
+    ('R4', 19.5,  2.5,  90, True),
+    ('C27',11.6,  4.6,  90, False),
     # --- crystal ---
-    ('Y1', 13.8,  3.65,  0, False),
-    ('C32',11.3,  3.6,  90, False), ('C33',16.3, 3.6, 90, False),
+    ('Y1', 15.0,  3.9,   0, False),
+    ('C32',12.5,  3.8,  90, False), ('C33',17.7, 3.8, 90, False),
     # --- LDO ---
-    ('U2', 10.9,  8.0, 180, False),
-    ('C12', 8.9, 10.4,   0, False), ('C13',11.1, 10.4, 0, False), ('C14',12.3, 11.9, 90, False),
+    ('U2', 11.6,  8.9, 180, False),
+    ('C12',10.0, 11.3,   0, False), ('C13',12.2, 11.3, 0, False), ('C14',13.9, 11.9, 90, False),
     # --- nRF52832 ---
-    ('U3', 16.9,  9.4,  90, False),
-    ('C25',14.0, 14.9,  90, False), ('C26',21.3,  7.5, 90, False),
-    ('C28',21.3,  9.0, 90, False), ('C29',21.3, 10.5, 90, False),
-    ('C30',15.3, 14.9, 90, False), ('C31',16.5, 14.9, 90, False),
-    ('L2', 19.6, 15.4,  90, False), ('L3', 18.0, 15.3, 90, False),
-    # --- RF corner ---
-    ('FL1',17.9,  3.6,   0, False),
-    ('C35',19.0,  4.3,  90, False),
-    ('R15',20.4,  3.8,   0, False),
-    ('C34',22.3,  4.2,  90, False),
-    ('E1', 22.4,  1.5,   0, False),
+    ('U3', 18.6, 10.2,  90, False),
+    ('C25',15.6, 16.0,  90, False), ('C30',16.9, 15.9, 90, False), ('C31',18.2, 15.9, 90, False),
+    ('C26',23.2,  7.6,  90, False), ('C28',23.2, 9.4, 90, False), ('C29',23.2, 11.2, 90, False),
+    ('L2', 21.6, 16.2,  90, False), ('L3', 22.9, 13.4, 90, False),
+    # --- RF corner (keepout x21..26, y0..3.2) ---
+    ('FL1',19.6,  4.0,   0, False),
+    ('C35',20.7,  4.9,  90, False),
+    ('R15',21.7,  4.0,   0, False),
+    ('C34',23.2,  4.9,  90, False),
+    ('E1', 24.3,  1.6,   0, False),
     # --- SWD, charger IC, LED (bottom-right) ---
-    ('J2', 22.7, 17.6,  90, False),
-    ('U6', 16.6, 20.3,   0, False),
-    ('D1', 19.7, 20.9,   0, False), ('R14',21.6, 20.9, 0, False),
+    ('J2', 24.5, 19.4,  90, True),
+    ('U6', 18.6, 21.9,   0, False),
+    ('R3', 20.7, 21.8,  90, True),
+    ('D1', 21.4, 22.6,   0, False), ('R14',23.0, 22.6, 0, False),
     # --- AFE, bottom-left ---
-    ('U5',  4.4, 14.2,   0, False),
-    ('C16', 6.95, 13.6, 90, False), ('C17', 7.9, 13.6, 90, False),
-    ('C18', 9.0, 13.7,  90, False), ('C19',10.05, 13.6, 90, False),
-    ('R7', 11.0, 13.6,  90, False), ('R8', 11.95, 13.6, 90, False), ('C20',12.9, 13.6, 90, False),
-    ('U4',  4.8, 18.3,   0, False),
-    ('R10', 1.3, 17.3,  90, False), ('C21', 1.2, 19.1, 90, False),
-    ('R9',  8.7, 16.9,   0, False),
-    ('R11', 9.3, 18.1,   0, False), ('C22', 9.3, 19.4, 0, False),
-    ('R12',11.2, 16.6,  90, False), ('C23',12.1, 16.6, 90, False),
-    ('R13',11.2, 18.6,  90, False), ('C24',12.1, 18.6, 90, False),
-    ('TP1',13.6, 17.2,   0, False), ('TP2',13.6, 19.0, 0, False), ('TP3',13.6, 20.8, 0, False),
-    ('J1',  6.0, 21.2,   0, False),
-    ('R5', 10.4, 20.9,  90, False), ('R6', 11.3, 20.9, 90, False), ('C15',12.2, 20.9, 90, False),
+    ('U5',  4.6, 15.6,   0, False),
+    ('C16', 7.4, 15.0,  90, False), ('C17', 8.3, 15.0, 90, False),
+    ('C18', 9.4, 15.1,  90, False), ('C19',10.5, 15.0, 90, False),
+    ('R7', 11.4, 15.0,  90, False), ('R8', 12.3, 15.0, 90, False), ('C20',13.2, 15.0, 90, False),
+    ('U4',  5.0, 20.0,   0, False),
+    ('R10', 2.4, 18.0,  90, True), ('C21', 2.4, 19.7, 90, True),
+    ('R9',  9.2, 18.4,   0, False),
+    ('R11', 9.8, 19.6,   0, False), ('C22', 9.8, 20.8, 0, False),
+    ('R12',12.0, 18.2,  90, False), ('C23',12.9, 18.2, 90, False),
+    ('R13',12.0, 20.2,  90, False), ('C24',12.9, 20.2, 90, False),
+    ('TP1',14.8, 18.2,   0, False), ('TP2',14.8, 20.0, 0, False), ('TP3',14.8, 21.8, 0, False),
+    ('J1',  5.4, 23.0,   0, False),
+    ('R5',  2.5, 21.5,  90, True), ('R6', 3.7, 21.5, 90, True), ('C15', 4.9, 21.5, 90, True),
     # --- back side: tab-welded cell ---
-    ('BT1',12.0, 11.0,   0, True),
+    ('BT1',13.0, 12.5,   0, True),
 ]
 
 FP_OVERRIDE = {
@@ -293,7 +296,7 @@ kz.SetDoNotAllowVias(True)
 kz.SetDoNotAllowTracks(False)
 kz.SetDoNotAllowPads(False)
 kz.SetDoNotAllowFootprints(False)
-kz.Outline().AddOutline(poly_chain([(19.0, -0.5), (BW + 0.5, -0.5), (BW + 0.5, 3.2), (19.0, 3.2)]))
+kz.Outline().AddOutline(poly_chain([(21.0, -0.5), (BW + 0.5, -0.5), (BW + 0.5, 3.2), (21.0, 3.2)]))
 kz.SetZoneName('ANT_KEEPOUT')
 board.Add(kz)
 
@@ -328,12 +331,22 @@ def text(s, x, y, layer, size=0.8):
     t.SetTextThickness(FromMM(size * 0.15))
     board.Add(t)
 
-text('ANT KEEPOUT 5x3\nNO COPPER ALL LAYERS', 21.5, 1.6, pcbnew.Dwgs_User, 0.5)
-text('discrete-potentiostat 24x22 RevA', 12, 10.2, pcbnew.F_SilkS, 0.7)
+text('ANT KEEPOUT 5x3\nNO COPPER ALL LAYERS', 23.5, 1.6, pcbnew.Dwgs_User, 0.5)
+text('discrete-potentiostat 26x24 RevB', 13, 11.0, pcbnew.F_SilkS, 0.7)
 text('coil 20x20 under battery,\nleads to L1 pads', 4.5, 10.5, pcbnew.Cmts_User, 0.5)
 
+# battery cell zone on back (no components inside)
+import math as _m
+for k in range(36):
+    a1, a2 = 2*_m.pi*k/36, 2*_m.pi*(k+1)/36
+    s2 = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
+    s2.SetStart(MM(13.0+10.5*_m.cos(a1), 12.5+10.5*_m.sin(a1)))
+    s2.SetEnd(MM(13.0+10.5*_m.cos(a2), 12.5+10.5*_m.sin(a2)))
+    s2.SetLayer(pcbnew.Cmts_User); s2.SetWidth(FromMM(0.08))
+    board.Add(s2)
+
 # coil outline reference on drawings layer (stack position, shifted away from RF corner)
-for (x1, y1, x2, y2) in [(0.5, 1.5, 20.5, 1.5), (20.5, 1.5, 20.5, 21.5), (20.5, 21.5, 0.5, 21.5), (0.5, 21.5, 0.5, 1.5)]:
+for (x1, y1, x2, y2) in [(0.5, 3.0, 20.5, 3.0), (20.5, 3.0, 20.5, 23.0), (20.5, 23.0, 0.5, 23.0), (0.5, 23.0, 0.5, 3.0)]:
     s = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
     s.SetStart(MM(x1, y1)); s.SetEnd(MM(x2, y2))
     s.SetLayer(pcbnew.Cmts_User); s.SetWidth(FromMM(0.08))
