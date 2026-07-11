@@ -1047,7 +1047,7 @@
         (effects (font (size 1 1) (thickness 0.15)))
       (tstamp ec552638-71ba-4269-a8ed-d8421ef213b4)
     )
-    (fp_text value "OPA2391DGKR" (at 0.02 2.73) (layer "F.Fab")
+    (fp_text value "LPV802DGKR" (at 0.02 2.73) (layer "F.Fab")
         (effects (font (size 1 1) (thickness 0.15)))
       (tstamp 3d290897-68db-4680-bd77-8a0b657e7aed)
     )

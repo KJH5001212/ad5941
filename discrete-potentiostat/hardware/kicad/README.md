@@ -11,7 +11,7 @@
 | BQ51013BRHL 핀맵 | ✅ KiCad 공식 BQ51050BRHL 심볼(동일 계열 패키지) 기반 + 차이 핀(4 OUT, 10 EN1) 데이터시트 확인 |
 | MCP73832 핀맵 | ✅ KiCad 공식 라이브러리 (1 STAT / 2 VSS / 3 VBAT / 4 VDD / 5 PROG) |
 | MIC5205 핀맵 | ✅ KiCad 공식 라이브러리 (1 IN / 2 GND / 3 EN / 4 BYP / 5 OUT) |
-| OPA2391 DGK 핀맵 | ✅ 데이터시트 확인 (표준 듀얼: 1 OUTA / 2 −INA / 3 +INA / 4 V− / 5 +INB / 6 −INB / 7 OUTB / 8 V+) |
+| LPV802 DGK 핀맵 | ✅ 표준 듀얼 (1 OUTA / 2 −INA / 3 +INA / 4 V− / 5 +INB / 6 −INB / 7 OUTB / 8 V+) — VSSOP-8, OPA2391과 핀·풋프린트 호환 |
 | REF35102 DBV 핀맵 | ✅ 데이터시트 확인 (1,2 GND / 3 EN / 4 VIN / 5 NR / 6 VREF) |
 | nRF52832-QFAA 핀맵 (48+EP) | ✅ KiCad 공식 라이브러리 (MCU_Nordic:nRF52832-QFxx) |
 | RF 프런트엔드 | ✅ Johanson 2450FM07A0029 = nRF52832 QFN 전용 매칭 LPF (벤더 확인) — 4핀 배치는 데이터시트 랜드패턴 따를 것 |

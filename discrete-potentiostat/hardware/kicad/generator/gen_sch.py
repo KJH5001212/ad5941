@@ -91,13 +91,13 @@ CUSTOM_FL = '''(symbol "pstat:2450FM07A0029" (in_bom yes) (on_board yes)
     )'''
 
 
-CUSTOM_OPA = '''(symbol "pstat:OPA2391DGKR" (in_bom yes) (on_board yes)
+CUSTOM_OPA = '''(symbol "pstat:LPV802DGKR" (in_bom yes) (on_board yes)
       (property "Reference" "U" (at 5.08 16.51 0) (effects (font (size 1.27 1.27))))
-      (property "Value" "OPA2391DGKR" (at 5.08 13.97 0) (effects (font (size 1.27 1.27))))
+      (property "Value" "LPV802DGKR" (at 5.08 13.97 0) (effects (font (size 1.27 1.27))))
       (property "Footprint" "Package_SO:VSSOP-8_3.0x3.0mm_P0.65mm" (at 0 -19.05 0) (effects (font (size 1.27 1.27)) hide))
-      (property "Datasheet" "https://www.ti.com/lit/ds/symlink/opa2391.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-      (property "Description" "Dual precision op amp, fA input bias, RRIO, VSSOP-8" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-      (symbol "OPA2391DGKR_0_1"
+      (property "Datasheet" "https://www.ti.com/lit/ds/symlink/lpv802.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Description" "Dual nanopower op amp, 320nA/ch, 0.1pA input bias, 8kHz GBW, VSSOP-8" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "LPV802DGKR_0_1"
         (rectangle (start -10.16 12.7) (end 10.16 -12.7)
           (stroke (width 0.254) (type default)) (fill (type background)))
         (polyline (pts (xy -6.35 8.89) (xy -6.35 3.81) (xy -1.27 6.35) (xy -6.35 8.89))
@@ -107,7 +107,7 @@ CUSTOM_OPA = '''(symbol "pstat:OPA2391DGKR" (in_bom yes) (on_board yes)
         (text "A" (at -7.62 8.89 0) (effects (font (size 1.016 1.016))))
         (text "B" (at -7.62 -3.81 0) (effects (font (size 1.016 1.016))))
       )
-      (symbol "OPA2391DGKR_1_1"
+      (symbol "LPV802DGKR_1_1"
         (pin input line (at -12.7 7.62 0) (length 2.54)
           (name "-IN_A" (effects (font (size 1.27 1.27))))
           (number "2" (effects (font (size 1.27 1.27)))))
@@ -205,10 +205,10 @@ def build_symbol_library():
     mic = set_property(mic, 'Datasheet', 'https://ww1.microchip.com/downloads/en/DeviceDoc/MIC5205-Data-Sheet-DS20006424A.pdf')
     mic = set_property(mic, 'Description', '150mA LDO 3.3V, low-noise, SOT-23-5 (pin-compatible AP131 base symbol)')
     syms['pstat:MIC5205-3.3YM5'] = prefix_libname(mic, 'MIC5205-3.3YM5', 'pstat:MIC5205-3.3YM5')
-    syms['pstat:OPA2391DGKR'] = CUSTOM_OPA
+    syms['pstat:LPV802DGKR'] = CUSTOM_OPA
     syms['pstat:REF35102QDBVR'] = CUSTOM_REF35
     syms['pstat:2450FM07A0029'] = CUSTOM_FL
-    for base in ['Crystal','Antenna']:
+    for base in ['Crystal_GND24','Antenna']:
         syms['Device:'+base] = prefix_libname(load(base), base, 'Device:'+base)
     nrf = load('nRF52832-QFxx')
     nrf = set_property(nrf, 'Value', 'nRF52832-QFAA')
@@ -271,7 +271,7 @@ def layout():
         '4':'V5OUT', '2':GND, '3':VB, '5':'PROG', '1':'CHG_N'})
     add('C27','Device:C', 280, 102, '4.7u 10V','Capacitor_SMD:C_0603_1608Metric', {'1':VB,'2':GND})
     # ---------------- battery + LDO + monitor ----------------
-    add('BT1','Device:Battery_Cell', 230, 60, 'LIR2032','Battery:BT_Keystone_3034_1x2032', {'1':VB,'2':GND})
+    add('BT1','Device:Battery_Cell', 230, 60, 'LIR2032','Battery:BatteryHolder_Keystone_3034_1x20mm', {'1':VB,'2':GND})
     add('U2','pstat:MIC5205-3.3YM5', 270, 55, 'MIC5205-3.3YM5','Package_TO_SOT_SMD:SOT-23-5', {
         '1':VB, '2':GND, '3':VB, '4':'BYP', '5':V3})
     add('C12','Device:C', 250, 75, '1u 10V','Capacitor_SMD:C_0402_1005Metric', {'1':VB,'2':GND})
@@ -290,7 +290,7 @@ def layout():
     add('R7','Device:R', 110, 185, '1M 1%','Resistor_SMD:R_0402_1005Metric', {'1':'VREF','2':'VBIAS'})
     add('R8','Device:R', 110, 205, '1M 1%','Resistor_SMD:R_0402_1005Metric', {'1':'VBIAS','2':GND})
     add('C20','Device:C', 122, 205, '100n','Capacitor_SMD:C_0402_1005Metric', {'1':'VBIAS','2':GND})
-    add('U4','pstat:OPA2391DGKR', 152, 248, 'OPA2391DGKR','Package_SO:VSSOP-8_3.0x3.0mm_P0.65mm', {
+    add('U4','pstat:LPV802DGKR', 152, 248, 'OPA2391DGKR','Package_SO:VSSOP-8_3.0x3.0mm_P0.65mm', {
         '1':'CE_AMP', '2':'RE', '3':'VBIAS',
         '5':'VREF', '6':'WE', '7':'TIA_OUT',
         '8':'AFE_PWR', '4':GND})
@@ -303,7 +303,7 @@ def layout():
     add('C23','Device:C', 212, 248, '10n C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'ADC_P','2':GND})
     add('R13','Device:R', 200, 268, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'VREF','2':'ADC_N'})
     add('C24','Device:C', 212, 276, '10n C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'ADC_N','2':GND})
-    add('J1','Connector_Generic:Conn_01x03', 30, 250, 'ELECTRODES','Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical', {
+    add('J1','Connector_Generic:Conn_01x03', 30, 250, 'ELECTRODES','pstat:SolderPads_1x03_D1.0mm', {
         '1':'CE','2':'RE','3':'WE'})
     add('TP1','Connector:TestPoint', 60, 235, 'TP_VREF','TestPoint:TestPoint_Pad_D1.5mm', {'1':'VREF'})
     add('TP2','Connector:TestPoint', 70, 235, 'TP_TIA','TestPoint:TestPoint_Pad_D1.5mm', {'1':'TIA_OUT'})
@@ -328,7 +328,7 @@ def layout():
     add('L2','Device:L', 296, 152, '10uH LQM21PN100','Inductor_SMD:L_0805_2012Metric', {'1':'DCC','2':'DCDC_MID'})
     add('L3','Device:L', 306, 152, '15nH','Inductor_SMD:L_0402_1005Metric', {'1':'DCDC_MID','2':'DEC4'})
     # 32MHz crystal (CL 8pF) + load caps
-    add('Y1','Device:Crystal', 240, 250, '32MHz 8pF 10ppm','Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm', {'1':'XC1','2':'XC2'})
+    add('Y1','Device:Crystal_GND24', 240, 250, '32MHz 8pF 10ppm','Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm', {'1':'XC1','2':GND,'3':'XC2','4':GND})
     add('C32','Device:C', 228, 258, '12p C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'XC1','2':GND})
     add('C33','Device:C', 250, 258, '12p C0G','Capacitor_SMD:C_0402_1005Metric', {'1':'XC2','2':GND})
     # RF chain: ANT -> matched filter -> tee (series 0R, shunt DNP) -> chip antenna
@@ -340,7 +340,7 @@ def layout():
     add('E1','Device:Antenna', 352, 232, '2450AT07A0100','pstat:Johanson_2450AT07A0100', {'1':'ANT_FEED'})
     add('R14','Device:R', 330, 165, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'LED_R','2':'LED_A'})
     add('D1','Device:LED', 330, 180, 'GREEN','LED_SMD:LED_0603_1608Metric', {'1':GND,'2':'LED_A'})
-    add('J2','Connector_Generic:Conn_01x05', 340, 220, 'SWD','Connector_PinHeader_1.27mm:PinHeader_1x05_P1.27mm_Vertical', {
+    add('J2','Connector_Generic:Conn_01x05', 340, 220, 'SWD','pstat:SolderPads_1x05_D1.0mm', {
         '1':V3,'2':'SWDIO','3':'SWDCLK','4':'NRST','5':GND})
     # ---------------- power flags ----------------
     add('#FLG01','power:PWR_FLAG', 385, 40, 'PWR_FLAG','', {'1':GND})

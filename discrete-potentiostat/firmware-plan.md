@@ -25,7 +25,7 @@
 ## 신규 작성
 
 ### 1. AFE 제어 (GPIO)
-- `AFE_PWR` GPIO (고드라이브): 측정 시작 시 HIGH → REF/OPA2391 급전,
+- `AFE_PWR` GPIO (고드라이브): 측정 시작 시 HIGH → REF/LPV802 급전 (AFE 합계 ~2 µA),
   안정화 대기 ~50 ms 후 샘플링 시작. 정지 시 LOW (전극 분극 방지 + 소모 0).
 
 ### 2. SAADC 측정 엔진
