@@ -2,7 +2,7 @@
 """Placement checks without touching risky bbox APIs."""
 import pcbnew
 from pcbnew import ToMM
-import os; board = pcbnew.LoadBoard(os.environ.get('PCB_FILE', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'discrete-potentiostat.kicad_pcb')))
+board = pcbnew.LoadBoard('/home/user/ad5941/discrete-potentiostat/hardware/kicad/discrete-potentiostat.kicad_pcb')
 BX, BY, BW, BH = 100.0, 100.0, 24.0, 22.0
 items = []
 for fp in board.GetFootprints():

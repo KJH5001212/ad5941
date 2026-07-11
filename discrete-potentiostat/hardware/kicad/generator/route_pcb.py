@@ -25,7 +25,10 @@ CLR = 0.10
 
 board = pcbnew.LoadBoard(PCB)
 F, B = pcbnew.F_Cu, pcbnew.B_Cu
-LAYERS = [F, B]
+IN2, IN3 = pcbnew.In2_Cu, pcbnew.In3_Cu
+LAYERS = [F, IN2, IN3, B]
+NL = len(LAYERS)
+LI_OF = {F: 0, IN2: 1, IN3: 2, B: 3}
 
 def mm_pt(p):  # absolute -> board-relative mm
     return ToMM(p.x) - BX, ToMM(p.y) - BY
@@ -49,7 +52,7 @@ for fp in board.GetFootprints():
         on_f = pad.IsOnLayer(F)
         on_b = pad.IsOnLayer(B)
         tht = pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH
-        rec = dict(net=net, x=x, y=y, rect=rect, f=on_f or tht, b=on_b or tht,
+        rec = dict(net=net, x=x, y=y, rect=rect, f=on_f or tht, b=on_b or tht, tht=tht,
                    ref=fp.GetReference(), num=pad.GetNumber())
         all_pads.append(rec)
         pads_by_net.setdefault(net, []).append(rec)
@@ -105,15 +108,15 @@ def base_grid(width):
     infl = CLR + width/2
     grid = new_grid()
     # board edge margin
-    for li in range(2):
+    for li in range(NL):
         g = grid[li]
         m = int((EDGE+width/2)/STEP)
         for j in range(NY):
             for i in range(NX):
                 if i < m or j < m or i > NX-1-m or j > NY-1-m:
                     g[j*NX+i] = 1
-    # antenna keepout (both layers, all auto nets)
-    for li in range(2):
+    # antenna keepout (all routing layers)
+    for li in range(NL):
         stamp_rect(grid, li, KEEP[0], KEEP[1], KEEP[2], KEEP[3], 0)
     # existing tracks (RF pre-route)
     for (s, e, w, layer, net) in exist_tracks:
@@ -128,8 +131,11 @@ def stamp_pads(grid, width, skip_net):
     for p in all_pads:
         if p['net'] == skip_net: continue
         x0, y0, x1, y1 = p['rect']
-        if p['f']: stamp_rect(grid, 0, x0, y0, x1, y1, infl)
-        if p['b']: stamp_rect(grid, 1, x0, y0, x1, y1, infl)
+        if p.get('tht'):
+            for li in range(NL): stamp_rect(grid, li, x0, y0, x1, y1, infl)
+        else:
+            if p['f']: stamp_rect(grid, 0, x0, y0, x1, y1, infl)
+            if p['b']: stamp_rect(grid, NL-1, x0, y0, x1, y1, infl)
 
 routed_segs = []   # (x0,y0,x1,y1,w,li,net)
 routed_vias = []   # (x,y,net)
@@ -141,7 +147,7 @@ def stamp_routed(grid, width, skip_net):
         stamp_seg(grid, li, x0, y0, x1, y1, infl + w/2)
     for (x, y, net) in routed_vias:
         if net == skip_net: continue
-        for li in range(2):
+        for li in range(NL):
             stamp_rect(grid, li, x, y, x, y, infl + VIA_D/2)
 
 # --------------------------------------------------------------- A* router ---
@@ -185,9 +191,11 @@ def astar(grid, starts, targets, via_ok, f_penalty=1.0):
                 dist[nxt] = nd; prev[nxt] = cur
                 heapq.heappush(openq, (nd + h(ni, nj), nd, nxt))
         if via_ok and via_free(grid, i, j):
-            nxt = (i, j, 1-li)
-            if nxt not in seen:
-                nd = d + 10.0            # via cost ~0.5mm detour (0.05 grid)
+            for lj in range(NL):
+                if lj == li: continue
+                nxt = (i, j, lj)
+                if nxt in seen: continue
+                nd = d + 10.0
                 if nd < dist.get(nxt, 1e18):
                     dist[nxt] = nd; prev[nxt] = cur
                     heapq.heappush(openq, (nd + h(i, j), nd, nxt))
@@ -195,7 +203,7 @@ def astar(grid, starts, targets, via_ok, f_penalty=1.0):
 
 def via_free(grid, i, j):
     r = int((VIA_D/2 + CLR)/STEP)
-    for li in range(2):
+    for li in range(NL):
         g = grid[li]
         for dj in range(-r, r+1):
             jj = j+dj
@@ -221,7 +229,9 @@ def pad_cells(p, grid, width):
     for (i, j) in cand:
         if not (0 <= i < NX and 0 <= j < NY): continue
         if p['f']: out.append((i, j, 0))
-        if p['b']: out.append((i, j, 1))
+        if p['b']: out.append((i, j, NL-1))
+        if p.get('tht'):
+            out.append((i, j, 1)); out.append((i, j, 2))
     return out
 
 def seg_simplify(path):
@@ -261,7 +271,7 @@ def soft_grid(width, skip_net):
             mark(li, x, y, x, y, infl + w/2, net)
     for (x, y, net) in routed_vias:
         if net == skip_net: continue
-        for li in range(2):
+        for li in range(NL):
             mark(li, x, y, x, y, infl + VIA_D/2, net)
     return own
 
@@ -301,8 +311,10 @@ def astar_soft(grid, own, starts, targets, via_ok):
                 dist[nxt] = nd; prev[nxt] = cur
                 heapq.heappush(openq, (nd, nxt))
         if via_ok and via_free(grid, i, j):
-            nxt = (i, j, 1-li)
-            if nxt not in seen:
+            for lj in range(NL):
+                if lj == li: continue
+                nxt = (i, j, lj)
+                if nxt in seen: continue
                 nd = d + 16.0
                 if nd < dist.get(nxt, 1e18):
                     dist[nxt] = nd; prev[nxt] = cur
@@ -353,7 +365,7 @@ def find_netname(n):
 # ---- resume mode: seed router state from existing copper -------------------
 if RESUME:
     for (s, e, w, layer, net, obj) in resume_tracks:
-        li = 0 if layer == F else 1
+        li = LI_OF.get(layer, 0)
         routed_segs.append((s[0], s[1], e[0], e[1], w, li, net))
         items_by_net.setdefault(net, []).append(obj)
     for ((x, y), net, obj) in resume_vias:
@@ -365,14 +377,14 @@ def connected_components(name):
     pads = pads_by_net[name]
     nodes = []   # (kind, idx, key points [(x,y,li)...])
     for k, p in enumerate(pads):
-        pts = [(p['x'], p['y'], 0 if p['f'] else 1)]
+        pts = [(p['x'], p['y'], 0 if p['f'] else NL-1)]
         if p['f'] and p['b']:
-            pts.append((p['x'], p['y'], 1))
+            pts.append((p['x'], p['y'], NL-1))
         nodes.append(('pad', k, pts, p))
     for s in [s for s in routed_segs if s[6] == name]:
         nodes.append(('seg', None, [(s[0], s[1], s[5]), (s[2], s[3], s[5])], s))
     for v in [v for v in routed_vias if v[2] == name]:
-        nodes.append(('via', None, [(v[0], v[1], 0), (v[0], v[1], 1)], v))
+        nodes.append(('via', None, [(v[0], v[1], _l) for _l in range(NL)], v))
     parent = list(range(len(nodes)))
     def find(a):
         while parent[a] != a:
@@ -382,11 +394,11 @@ def connected_components(name):
         ra, rb = find(a), find(b)
         if ra != rb: parent[ra] = rb
     def near(p1, p2):
-        return p1[2] == p2[2] and abs(p1[0]-p2[0]) < 0.65 and abs(p1[1]-p2[1]) < 0.65
+        return p1[2] == p2[2] and abs(p1[0]-p2[0]) < 0.12 and abs(p1[1]-p2[1]) < 0.12
     def pad_touch(p, pt):
         x0, y0, x1, y1 = p['rect']
-        li = 0 if p['f'] else 1
-        lis = {0, 1} if (p['f'] and p['b']) else {li}
+        li = 0 if p['f'] else NL-1
+        lis = {0, NL-1} if (p['f'] and p['b']) else {li}
         return pt[2] in lis and x0-0.1 <= pt[0] <= x1+0.1 and y0-0.1 <= pt[1] <= y1+0.1
     for a in range(len(nodes)):
         for b in range(a+1, len(nodes)):
@@ -473,8 +485,17 @@ net_todo = {}      # name -> list of pads still unconnected
 todo = [(n, ps) for n, ps in pads_by_net.items()
         if n not in ('GND', '') and len(ps) > 1
         and n not in ('ANT', 'ANT50', 'ANT_FEED')]
+import json as _json
+_OVR = None
+if RESUME and os.path.exists(os.path.join(HERE, 'todo_override.json')):
+    _OVR = _json.load(open(os.path.join(HERE, 'todo_override.json')))
+    print('todo override:', {k: len(v) for k, v in _OVR.items()})
 for name, pads in todo:
-    net_todo[name] = connected_components(name) if RESUME else pads[1:]
+    if _OVR is not None:
+        want = {(r, n) for r, n in _OVR.get(name, [])}
+        net_todo[name] = [p for p in pads if (p['ref'], p['num']) in want]
+    else:
+        net_todo[name] = connected_components(name) if RESUME else pads[1:]
     net_tree[name] = None      # lazy init with pads[0]
 
 def route_net(name, pads0):
@@ -491,7 +512,7 @@ def route_net(name, pads0):
                 t.add((ii, jj, s[5]))
         for v in [v for v in routed_vias if v[2] == name]:
             ii, jj = to_cell(v[0], v[1])
-            t.add((ii, jj, 0)); t.add((ii, jj, 1))
+            for _l in range(NL): t.add((ii, jj, _l))
         net_tree[name] = t
     tree = net_tree[name]
     still = []
@@ -508,9 +529,9 @@ def route_net(name, pads0):
                 x, y = cell_mm(a[0], a[1])
                 add_via(x, y, find_netname(name))
                 routed_vias.append((x, y, name))
-                tree.add((a[0], a[1], 0)); tree.add((a[0], a[1], 1))
-                stamp_rect(grid, 0, x, y, x, y, VIA_D/2 + CLR)
-                stamp_rect(grid, 1, x, y, x, y, VIA_D/2 + CLR)
+                for _l in range(NL): tree.add((a[0], a[1], _l))
+                for _l in range(NL):
+                    stamp_rect(grid, _l, x, y, x, y, VIA_D/2 + CLR)
             else:
                 x0, y0 = cell_mm(a[0], a[1]); x1, y1 = cell_mm(b[0], b[1])
                 add_track(x0, y0, x1, y1, w, LAYERS[a[2]], find_netname(name))
@@ -545,12 +566,16 @@ while qi < len(queue):
     path, crossed = astar_soft(grid, own, starts, tree, via_ok=True)
     if path is None or not crossed or rip_budget <= 0:
         continue
-    victims = [v for v in crossed if v != name and v not in POWER and len(pads_by_net.get(v, [])) <= 3][:2]
+    if os.environ.get('AGGRO') == '1':
+        victims = [v for v in crossed if v != name][:3]
+    else:
+        victims = [v for v in crossed if v != name and v not in POWER and len(pads_by_net.get(v, [])) <= 3][:2]
     if not victims: continue
     rip_budget -= len(victims)
     for v in victims:
         rip_net(v)
-    rip_net(name)
+    if len(pads_by_net[name]) <= 3 and name not in POWER:
+        rip_net(name)
     queue.append(name)
     for v in victims:
         queue.append(v)
@@ -590,11 +615,11 @@ for p in sorted(pads_by_net.get('GND', []), key=lambda q: (q['x'], q['y'])):
             x, y = cell_mm(i, j)
             if KEEP[0] < x < KEEP[2] and KEEP[1] < y < KEEP[3]: continue
             if not via_free(gnd_grid, i, j): continue
-            li = 0 if p['f'] else 1
+            li = 0 if p['f'] else NL-1
             add_track(p['x'], p['y'], x, y, W_SIG, LAYERS[li], find_netname('GND'))
             add_via(x, y, find_netname('GND'))
-            stamp_rect(gnd_grid, 0, x, y, x, y, VIA_D/2 + CLR + W_SIG)
-            stamp_rect(gnd_grid, 1, x, y, x, y, VIA_D/2 + CLR + W_SIG)
+            for _l in range(NL):
+                stamp_rect(gnd_grid, _l, x, y, x, y, VIA_D/2 + CLR + W_SIG)
             stamp_seg(gnd_grid, li, p['x'], p['y'], x, y, W_SIG/2 + CLR + W_SIG/2)
             gnd_vias.append((x, y))
             gnd_done += 1

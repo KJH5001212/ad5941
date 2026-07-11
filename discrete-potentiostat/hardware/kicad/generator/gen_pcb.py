@@ -79,7 +79,20 @@ for sec in tree:
 # ------------------------------------------------------------------ board ---
 board = pcbnew.BOARD()
 ds = board.GetDesignSettings()
-ds.SetCopperLayerCount(4)
+ds.SetCopperLayerCount(6)
+ds.m_TrackMinWidth = FromMM(0.09)
+ds.m_ViasMinSize = FromMM(0.4)
+ds.m_MinThroughDrill = FromMM(0.2)
+ds.m_MinClearance = FromMM(0.09)
+ds.m_HoleClearance = FromMM(0.2)
+ds.m_HoleToHoleMin = FromMM(0.2)
+ds.m_CopperEdgeClearance = FromMM(0.3)
+try:
+    nc = ds.m_NetSettings.m_DefaultNetClass
+    nc.SetClearance(FromMM(0.09)); nc.SetTrackWidth(FromMM(0.1))
+    nc.SetViaDiameter(FromMM(0.4)); nc.SetViaDrill(FromMM(0.2))
+except Exception as _e:
+    print('netclass', _e)
 nets = {}
 for name in sorted(netnames):
     ni = pcbnew.NETINFO_ITEM(board, name)
@@ -120,6 +133,11 @@ def make_custom(name):
     elif name == 'LIR2032_Tabs':               # tab-welded coin cell, 2 solder pads
         smd_pad(fp, 1, -9.8, 0, 2.8, 5.0)      # +tab
         smd_pad(fp, 2, 9.8, 0, 2.8, 5.0)       # -tab
+    elif name.startswith('SolderPads_1x'):     # wire-solder pads, D1.0mm, 1.8mm pitch
+        n = int(name.split('_1x')[1].split('_')[0])
+        for k in range(n):
+            p = smd_pad(fp, k+1, (k - (n-1)/2)*1.8, 0, 1.0, 1.0)
+            p.SetShape(pcbnew.PAD_SHAPE_CIRCLE)
     else:
         raise KeyError(name)
     return fp
@@ -158,7 +176,7 @@ PLACE = [
     ('C34',22.3,  4.2,  90, False),
     ('E1', 22.4,  1.5,   0, False),
     # --- SWD, charger IC, LED (bottom-right) ---
-    ('J2', 22.6, 14.3, 180, False),
+    ('J2', 22.7, 17.6,  90, False),
     ('U6', 16.6, 20.3,   0, False),
     ('D1', 19.7, 20.9,   0, False), ('R14',21.6, 20.9, 0, False),
     # --- AFE, bottom-left ---
@@ -173,7 +191,7 @@ PLACE = [
     ('R12',11.2, 16.6,  90, False), ('C23',12.1, 16.6, 90, False),
     ('R13',11.2, 18.6,  90, False), ('C24',12.1, 18.6, 90, False),
     ('TP1',13.6, 17.2,   0, False), ('TP2',13.6, 19.0, 0, False), ('TP3',13.6, 20.8, 0, False),
-    ('J1',  6.3, 21.0, 270, False),
+    ('J1',  6.0, 21.2,   0, False),
     ('R5', 10.4, 20.9,  90, False), ('R6', 11.3, 20.9, 90, False), ('C15',12.2, 20.9, 90, False),
     # --- back side: tab-welded cell ---
     ('BT1',12.0, 11.0,   0, True),
@@ -260,13 +278,13 @@ def gnd_zone(layer):
     z.SetMinThickness(FromMM(0.2))
     board.Add(z)
 
-for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu):
+for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In4_Cu, pcbnew.B_Cu):
     gnd_zone(layer)
 
 # antenna keepout: no copper pours / no vias on all layers; tracks allowed
 kz = pcbnew.ZONE(board)
 ls = pcbnew.LSET()
-for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu):
+for layer in (pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu):
     ls.AddLayer(layer)
 kz.SetLayerSet(ls)
 kz.SetIsRuleArea(True)

@@ -18,8 +18,8 @@
 | BT1 | LIR2032 **탭 용접형(솔더탭)** | 뒷면 패드 2개 | 3.7 V / ~40 mAh — Keystone 3034 홀더는 폭 27 mm로 24 mm 보드에 안 들어가 탭셀 채택. 보호회로 없음 — 펌웨어 컷오프 필수 |
 | L1 | TDK WR202010-18M8-ID | **20×20×1.0 mm** | Qi RX 코일, **11 µH ±5%**, DCR 350 mΩ, ~$3.6 |
 | D1 | LED GREEN 0603 | — | 상태 표시 (P0.07) |
-| J1 | 1×3 헤더/FPC | 2.54 mm | 전극 CE/RE/WE |
-| J2 | 1×5 헤더 | 1.27 mm | SWD (3V3/SWDIO/SWDCLK/RESET/GND) |
+| J1 | 납땜 패드 Ø1.0 mm ×3 | 피치 1.8 mm | 전극 CE/RE/WE 와이어 직납 |
+| J2 | 납땜 패드 Ø1.0 mm ×5 | 피치 1.8 mm | SWD 와이어 직납 (3V3/SWDIO/SWDCLK/RESET/GND) |
 | TP1–TP3 | 테스트포인트 | Ø1.5 mm | VREF / TIA_OUT / VBIAS |
 
 ## 수동소자 (회로도 Ref 순)

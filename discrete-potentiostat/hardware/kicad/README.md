@@ -36,24 +36,24 @@ QFN48 레퍼런스를 트레이스 형상까지 복사하고, 실보드에서 VN
 
 ## PCB (`discrete-potentiostat.kicad_pcb`)
 
-**24×22 mm, 4층** (L1 신호/RF · L2 GND · L3 GND · L4 신호+배터리 패드), 라운드 사각 퍽.
-`generator/gen_pcb.py`가 회로도 넷리스트에서 생성 — 풋프린트 70개 전부 넷 배정 완료.
+**24×22 mm, 6층** (사용자 결정 2026-07-11: 4층 대비 자동배선 미결선 20링크→8링크, RF/아날로그 격리 개선).
+스택업: **L1 신호/RF · L2 GND · L3 배선 · L4 배선 · L5 GND · L6 신호+배터리 패드**.
+설계규칙(보드에 저장): 트랙 최소 0.09 / 클리어런스 0.09 / 비아 0.4/0.2 — JLC 6층 표준 공정 내.
 
 | 항목 | 상태 |
 |---|---|
-| 배치 | ✅ 완료 — `check_pcb.py` 기준 **몸체 겹침 0건, 보드 이탈 0건** |
-| 안테나 킵아웃 | ✅ 룰 영역 (x19–24, y0–3.2): 전층 카퍼 포어·비아 금지, 급전 트레이스만 허용 |
-| RF 급전 | ✅ ANT→FL1→pi 슬롯→안테나 선행 배선 (50 Ω 목표 0.35 mm — 스택업 확정 후 폭 재계산) |
-| GND 존 | ✅ 4층 전부 GND 포어 (킵아웃 제외) |
-| 배터리 | ✅ 뒷면 탭셀 패드 (Keystone 3034은 27 mm 폭이라 미채택) |
-| 일반 배선 | 🟨 **자동배선 1차 완료 (~90%)** — `generator/route_pcb.py` (A* 그리드 라우터 + 립업). 미결선 39패드(~20링크)는 KiCad에서 래츠네스트 따라 마무리 |
-| DRC | 🟨 `drc-report.txt` 참고 — 전기적 실위반: 미결선 39, 클리어런스 12, 홀 3 (실크/코트야드 경고는 별도) |
-| 설계규칙 | ✅ 보드에 반영: 트랙 최소 0.09 / 클리어런스 0.09 / 비아 0.4/0.2 (JLC 4층 가능 범위) |
+| 배치 | ✅ 겹침 0 · 보드이탈 0 (`check_pcb.py`) — J1/J2는 **Ø1.0 mm 원형 납땜 패드**(와이어 직납, 피치 1.8 mm)로 변경 |
+| GND | ✅ L2·L5 통짜 플레인 + F/B 포어 + 스티칭 비아 |
+| RF 급전 | ✅ ANT→FL1→pi 슬롯→안테나 선행 배선 (보호됨) |
+| 신호 배선 | 🟨 자동배선 ~92% — **미결선 15패드(≈8링크)**: XC1(Y1·C32·U3.34), C4 양단(BOOT2/AC2), RECT(U1.18·C9), ADC_P(U3.5·C23), ADC_N(C24·R13), CLAMP1(C7), COMP(C21), VREF(TP1) |
+| DRC | 🟨 `drc-report.txt`: 미결선 30에지 + 클리어런스 7 + 댕글링 11 (실크/코트야드 경고 별도) |
 
-배치 개요: 좌상 Qi 충전부(코일 리드 패드 좌변) / 우상 RF 코너(칩안테나+킵아웃) /
-우중 nRF52832+수정 / 좌하 AFE(전극 헤더 J1 하단) / 우하 MCP73832·LED·SWD / 뒷면 중앙 배터리.
-쿼츠·AFE는 코일 인출선과 반대편. 라우팅 시 주의: WE 노드 가드링(VREF), C34 GND 패드는
-킵아웃 밖 포어까지 트레이스로, RF 트레이스는 Nordic 레퍼런스 형상 복사.
+### 마무리 가이드 (KiCad GUI, ~30분)
+
+1. 보드 열기 → `B`(존 채우기) → 흰 래츠네스트 = 남은 8링크
+2. `X` 라우팅 — **푸시&쇼브가 켜져 있으면 기존 트랙을 밀어내며 그려짐** (자동 라우터가 못 뚫은 지점들은 전부 이 방식으로 뚫림). L3/L4 내층이 비어 있으니 비아 2개로 우회 가능
+3. Edit → Cleanup Tracks & Vias (댕글링 11 제거) → DRC 재실행 → 클리어런스 7건 정리
+4. 커스텀 풋프린트 3종(FL1/E1/코일 패드) 랜드패턴 데이터시트 대조 후 가버 출력
 
 ## 재생성 방법
 
@@ -66,8 +66,9 @@ kicad-cli sch export netlist --output out.net ../discrete-potentiostat.kicad_sch
 python3 check_nets.py                  # 넷리스트 일치 확인 (RESULT: PASS 확인)
 python3 gen_pcb.py                     # ../discrete-potentiostat.kicad_pcb 생성 (pcbnew API)
 python3 check_pcb.py                   # 배치 겹침/보드이탈 검사 (flagged: 0 확인)
-python3 route_pcb.py                   # 자동배선 (GND 스티칭 + A* 립업 라우터)
-RESUME=1 python3 route_pcb.py          # 기존 배선 보존하며 미결선만 이어서 배선
+python3 route_pcb.py                   # 자동배선 (GND 스티칭 + A* 립업 라우터, 6층)
+RESUME=1 python3 route_pcb.py          # 기존 배선 보존, 미결선만 이어서 배선
+# todo_override.json(DRC 미결선 목록)을 두면 RESUME이 그 목록만 공략
 ```
 
 ### 배선 마무리 가이드 (KiCad GUI)
