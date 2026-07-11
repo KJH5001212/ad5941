@@ -46,8 +46,9 @@ QFN48 레퍼런스를 트레이스 형상까지 복사하고, 실보드에서 VN
 | RF 급전 | ✅ ANT→FL1→pi 슬롯→안테나 선행 배선 (50 Ω 목표 0.35 mm — 스택업 확정 후 폭 재계산) |
 | GND 존 | ✅ 4층 전부 GND 포어 (킵아웃 제외) |
 | 배터리 | ✅ 뒷면 탭셀 패드 (Keystone 3034은 27 mm 폭이라 미채택) |
-| 일반 배선 | ⬜ 미완 — 래츠네스트 상태, 인터랙티브 라우팅 필요 |
-| DRC | ⬜ KiCad 8+ GUI/CLI에서 실행 권장 (KiCad 7 CLI에는 DRC 없음) |
+| 일반 배선 | 🟨 **자동배선 1차 완료 (~90%)** — `generator/route_pcb.py` (A* 그리드 라우터 + 립업). 미결선 39패드(~20링크)는 KiCad에서 래츠네스트 따라 마무리 |
+| DRC | 🟨 `drc-report.txt` 참고 — 전기적 실위반: 미결선 39, 클리어런스 12, 홀 3 (실크/코트야드 경고는 별도) |
+| 설계규칙 | ✅ 보드에 반영: 트랙 최소 0.09 / 클리어런스 0.09 / 비아 0.4/0.2 (JLC 4층 가능 범위) |
 
 배치 개요: 좌상 Qi 충전부(코일 리드 패드 좌변) / 우상 RF 코너(칩안테나+킵아웃) /
 우중 nRF52832+수정 / 좌하 AFE(전극 헤더 J1 하단) / 우하 MCP73832·LED·SWD / 뒷면 중앙 배터리.
@@ -65,7 +66,16 @@ kicad-cli sch export netlist --output out.net ../discrete-potentiostat.kicad_sch
 python3 check_nets.py                  # 넷리스트 일치 확인 (RESULT: PASS 확인)
 python3 gen_pcb.py                     # ../discrete-potentiostat.kicad_pcb 생성 (pcbnew API)
 python3 check_pcb.py                   # 배치 겹침/보드이탈 검사 (flagged: 0 확인)
+python3 route_pcb.py                   # 자동배선 (GND 스티칭 + A* 립업 라우터)
+RESUME=1 python3 route_pcb.py          # 기존 배선 보존하며 미결선만 이어서 배선
 ```
+
+### 배선 마무리 가이드 (KiCad GUI)
+
+1. 보드 열고 `B`(존 채우기) → 흰 래츠네스트가 남은 미결선 (~20개, 대부분 U1 충전부 캡열과 U3 남서쪽)
+2. `X`로 라우팅 — 규칙은 이미 0.1/0.1로 설정됨, B면이 여유 있으니 비아 활용
+3. DRC 재실행해 클리어런스 12건(그리드 라우터의 45° 코너 근접) 정리
+4. track_dangling 11건 = 립업 잔재 스텁 — Edit > Cleanup Tracks & Vias로 일괄 제거
 
 배치를 바꾸려면 `gen_sch.py`의 `layout()` 좌표를 수정하거나, KiCad GUI에서 직접 옮기면 된다
 (연결은 라벨 기반이라 심볼을 옮겨도 넷은 유지됨).
