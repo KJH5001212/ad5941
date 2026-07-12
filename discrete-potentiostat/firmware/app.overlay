@@ -1,29 +1,25 @@
 /*
  * ============================================================
- *  디스크리트 포텐쇼스탯 RevC 보드 — nRF52832 배선 정의
+ *  디스크리트 포텐쇼스탯 보드 — nRF52832 배선 정의
+ *  (사용자 회로도 2026-07-12 확정 핀맵)
  *  ------------------------------------------------------------
  *  기능             넷           nRF52832 핀    비고
  *  ---------------  -----------  ------------   ----------------------
- *  SAADC 차동 −     VREF 1.024V  P0.02 / AIN0   REF35102 출력
- *  SAADC 차동 +     TIA_OUT      P0.03 / AIN1   ΔV = I×RF
+ *  SAADC 차동 +     TIA_OUT      P0.02 / AIN0   ΔV = I×RF
+ *  SAADC 차동 −     VREF 1.024V  P0.03 / AIN1   REF35102 출력
  *  VBAT 모니터      VBAT_DIV     P0.04 / AIN2   1M:1M 분압 (VBAT/2)
- *  AFE 전원         AFE_PWR      P0.06          high-drive, REF+LPV802 (~2µA)
- *  상태 LED         LED_R        P0.07          active-high
- *  충전 상태        CHG_N        P0.08          MCP73832 STAT, 100k 풀업, LOW=충전중
- *  RESET/SWDIO/SWDCLK = 표준 SWD (J2 납땜 패드)
+ *  Qi 패드 감지     Charge       P0.05 / AIN3   MCP73832_VDD(≈5V) 1M:1M 분압
+ *  AFE 전원(AVDD)   AVDD         P0.07          high-drive, REF35+LPV802 (~2µA)
+ *  충전 상태        GPIO(STAT)   P0.08          MCP73832 STAT, 100k 풀업, LOW=충전중
+ *  상태 LED(옵션)   —            P0.06          기본 미실장 — 실장 시 그대로 동작
+ *  RESET/SWDIO/SWDCLK = 표준 SWD
  *
  *  AD5941 없음 → SPI 없음. 32.768kHz 크리스탈 없음 → LFRC (prj.conf).
- *  DCC 인덕터(L2/L3) 실장됨 → DC/DC 모드 (전력 절감).
+ *  DCC 핀 미접속(인덕터 없음) → LDO 모드 (기본값 — &reg 오버라이드 금지).
  * ============================================================
  */
 
-#include <zephyr/dt-bindings/regulator/nrf5x.h>
 #include <zephyr/dt-bindings/gpio/nordic-nrf-gpio.h>
-
-/* 보드에 DC/DC 인덕터(10µH+15nH) 실장 → DCDC 모드로 소비전류 절감 */
-&reg {
-	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
-};
 
 /* SAADC 활성화 (채널 구성은 meas.c 에서 런타임 — 게인 오토레인지 때문) */
 &adc {
@@ -43,8 +39,9 @@
 
 / {
 	zephyr,user {
-		afe-pwr-gpios = <&gpio0 6 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>; /* high-drive */
-		led-gpios     = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+		/* AVDD 직접 급전: 부하 ~2µA. high-drive 로 C36(10µF) 충전 가속 */
+		afe-pwr-gpios = <&gpio0 7 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>;
+		led-gpios     = <&gpio0 6 GPIO_ACTIVE_HIGH>;  /* 옵션 — 미실장이어도 무해 */
 		/* STAT 오픈드레인 + 외부 100k 풀업 → 내부 풀 불필요, LOW=충전중 */
 		chg-gpios     = <&gpio0 8 GPIO_ACTIVE_LOW>;
 	};

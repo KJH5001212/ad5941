@@ -4,7 +4,7 @@
  *  (nRF52832 SAADC 직접측정 — AD5941 없음)
  *  ------------------------------------------------------------
  *  - 전위 +0.512V 하드웨어 고정 (REF35102 1.024V + 1:1 분압)
- *  - LPV802 TIA (RF 교체가능: 1M/5.1M/10M) → SAADC 차동 (AIN1−AIN0)
+ *  - LPV802 TIA (RF 교체가능: 1M/5.1M/10M) → SAADC 차동 (AIN0−AIN1)
  *  - SAADC 게인 오토레인지 {4, 1, 1/2} + 히스테리시스 + settle 폐기
  *  - HW 오버샘플링(런타임 설정) + 시간기반 페이싱 소프트 평균
  *  - 실행모드: Continuous / Timed / Cycle (대기중 AFE 전원 off = 분극 방지)
@@ -605,10 +605,11 @@ static void tx_status(void)
 	int n = snprintk(line, sizeof(line),
 		"{\"st\":\"%s\",\"mode\":%u,\"rate\":%u,\"cyc\":%u,\"range\":%d,"
 		"\"pend\":%u,\"buf\":%u,\"gap\":%d,"
-		"\"vbat\":%d,\"chg\":%d,\"lb\":%d,\"rf\":%u,\"os\":%u}\n",
+		"\"vbat\":%d,\"chg\":%d,\"qi\":%d,\"lb\":%d,\"rf\":%u,\"os\":%u}\n",
 		st, mode, rate, run_cycle, cur_range,
 		databuf_pending(), databuf_unacked(), (int)databuf_gap(),
-		g_vbat_mv, (int)meas_charging(), (int)low_batt, rf, os);
+		g_vbat_mv, (int)meas_charging(), (int)meas_qi_present(),
+		(int)low_batt, rf, os);
 	tx_nus(line, n);
 }
 
