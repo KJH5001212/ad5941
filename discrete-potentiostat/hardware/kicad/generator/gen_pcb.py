@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """Generate discrete-potentiostat.kicad_pcb (KiCad 7, pcbnew API).
 
-23.4 x 22 mm 6-layer RevC, double-sided (ICs top, small passives in the
-back corner pockets outside the LIR2032 zone). LAYERS4=1 env generates the
-4-layer experiment variant (does not route to completion at this density).
-Placement + zones + keepout + RF pre-route (drawn after legalize);
-run route_pcb.py + route_loop.sh afterwards; close4.py holds the final
-hand-routed links for THIS placement revision.
+24 x 22 mm 4-layer board. Placement + zones + antenna keepout + RF feed
+pre-route; general routing is left for interactive work (ratsnest ready).
 Origin: board top-left at (100,100) mm absolute.
 """
 import os, re, sys
@@ -130,9 +126,13 @@ def make_custom(name):
         smd_pad(fp, 2, -0.35, -0.15, 0.25, 0.2)   # note: pad map per datasheet before fab
         smd_pad(fp, 3, 0.35, 0.15, 0.25, 0.2)
         smd_pad(fp, 4, 0.35, -0.15, 0.25, 0.2)
-    elif name == 'Johanson_2450AT07A0100':    # E1 (VERIFY vs datasheet)
-        smd_pad(fp, 1, -0.4, 0, 0.3, 0.5)
-        smd_pad(fp, 2, 0.4, 0, 0.3, 0.5)      # pad2 = mechanical/NC end
+    elif name == 'Johanson_2450AT07A0100':    # E1 — datasheet 36S0021A Rev4.1
+        # 4-terminal: 1/4 = Feed (local +x end), 2/3 = GND. Land 0.3x0.25,
+        # rows +-0.3 along L, columns +-0.175 across W (eval board detail).
+        smd_pad(fp, 1,  0.3, -0.175, 0.3, 0.25)
+        smd_pad(fp, 2, -0.3, -0.175, 0.3, 0.25)
+        smd_pad(fp, 3, -0.3,  0.175, 0.3, 0.25)
+        smd_pad(fp, 4,  0.3,  0.175, 0.3, 0.25)
     elif name == 'TDK_WR202010':              # coil lead solder pads
         smd_pad(fp, 1, 0, -2.0, 1.8, 2.4)
         smd_pad(fp, 2, 0, 2.0, 1.8, 2.4)
@@ -177,7 +177,7 @@ PLACE = [
     ('C35',18.8,  4.9,  90, False),
     ('R15',19.8,  4.0,   0, False),
     ('C34',21.3,  4.9,  90, False),
-    ('E1', 22.3,  1.6,   0, False),
+    ('E1', 19.4, 0.95, 270, False),
     # --- SWD pads + test points: front right column (battery-free side) ---
     ('J2', 22.4, 10.6,  90, False),
     ('TP1',22.3, 16.0,   0, False), ('TP2',22.3, 17.8, 0, False), ('TP3',22.3, 19.6, 0, False),
@@ -440,11 +440,17 @@ try:
     path('ANT50', [(f3x, f3y), (f3x, f3y+0.75), (r1x-0.165, f3y+0.75),
                    (r1x-0.165, r1y+0.5), (r1x, r1y+0.32)], 0.15)
     path('ANT50', [(c5x, c5y), (c5x, f3y+0.75)], 0.15)
-    # ANT_FEED: R15.2 diag to C34.1, then east of C34.2 south into E1.1
+    # ANT_FEED: R15.2 diag to C34.1 (pi shunt slot) + feed bridge to E1 1/4
     r2 = rel(pad_pos('R15', '2')); c4 = rel(pad_pos('C34', '1'))
-    e1x, e1y = rel(pad_pos('E1', '1'))
     path('ANT_FEED', [r2, c4], 0.35)
-    path('ANT_FEED', [c4, (e1x, c4[1]-0.59), (e1x, e1y)], 0.2)
+    f1 = rel(pad_pos('E1', '1')); f4 = rel(pad_pos('E1', '4'))
+    fx = (f1[0] + f4[0]) / 2.0; fy = f1[1]              # feed row center
+    path('ANT_FEED', [(fx, fy), (fx, r2[1]-0.7), (r2[0]-0.135, r2[1]-0.7),
+                      (r2[0], r2[1]-0.56), (r2[0], r2[1]-0.1)], 0.35)
+    # GND strip: antenna GND row (pads 2/3) west into the F pour
+    g2 = rel(pad_pos('E1', '2'))
+    gx = max(rel(pad_pos('E1', '2'))[0], rel(pad_pos('E1', '3'))[0]) + 0.075
+    path('GND', [(gx, g2[1]), (18.0, g2[1])], 0.3)
 except Exception as e:
     print('RF preroute skipped:', e)
 

@@ -8,7 +8,7 @@ symbol whose anchor sits on the stub end). Rot-0 placement only -> transform is
 import os, re, uuid, json
 
 GEN = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.abspath(os.path.join(GEN, '..'))
+OUT = '/home/user/ad5941/discrete-potentiostat/hardware/kicad'
 
 def U(): return str(uuid.uuid4())
 
@@ -87,6 +87,35 @@ CUSTOM_FL = '''(symbol "pstat:2450FM07A0029" (in_bom yes) (on_board yes)
         (pin passive line (at 2.54 -6.35 90) (length 2.54)
           (name "GND" (effects (font (size 1.27 1.27))))
           (number "4" (effects (font (size 1.27 1.27)))))
+      )
+    )'''
+
+
+CUSTOM_ANT = '''(symbol "pstat:2450AT07A0100" (in_bom yes) (on_board yes)
+      (property "Reference" "E" (at -3.81 6.35 0) (effects (font (size 1.27 1.27))))
+      (property "Value" "2450AT07A0100" (at 0 -8.89 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "pstat:Johanson_2450AT07A0100" (at 0 -11.43 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "https://www.johansontechnology.com/docs/4417/Antenna-2450AT07A0100001T.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Description" "2.44GHz chip antenna, EIA 0402, 4-terminal: 1/4 Feed, 2/3 GND (Doc# 36S0021A Rev 4.1)" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "2450AT07A0100_0_1"
+        (rectangle (start -3.81 3.81) (end 3.81 -5.08)
+          (stroke (width 0.254) (type default)) (fill (type background)))
+        (polyline (pts (xy 0 3.81) (xy 0 5.08) (xy -1.27 6.35) (xy 1.27 6.35) (xy 0 5.08))
+          (stroke (width 0.254) (type default)) (fill (type none)))
+      )
+      (symbol "2450AT07A0100_1_1"
+        (pin passive line (at -6.35 1.27 0) (length 2.54)
+          (name "FEED" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at -6.35 -1.27 0) (length 2.54)
+          (name "FEED" (effects (font (size 1.27 1.27))))
+          (number "4" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at -1.27 -7.62 90) (length 2.54)
+          (name "GND" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 1.27 -7.62 90) (length 2.54)
+          (name "GND" (effects (font (size 1.27 1.27))))
+          (number "3" (effects (font (size 1.27 1.27)))))
       )
     )'''
 
@@ -208,6 +237,7 @@ def build_symbol_library():
     syms['pstat:LPV802DGKR'] = CUSTOM_OPA
     syms['pstat:REF35102QDBVR'] = CUSTOM_REF35
     syms['pstat:2450FM07A0029'] = CUSTOM_FL
+    syms['pstat:2450AT07A0100'] = CUSTOM_ANT
     for base in ['Crystal_GND24','Antenna']:
         syms['Device:'+base] = prefix_libname(load(base), base, 'Device:'+base)
     nrf = load('nRF52832-QFxx')
@@ -337,7 +367,7 @@ def layout():
     add('C35','Device:C', 328, 258, 'DNP (tune)','Capacitor_SMD:C_0402_1005Metric', {'1':'ANT50','2':GND}, dnp=True)
     add('R15','Device:R', 336, 245, '0R (tune)','Resistor_SMD:R_0402_1005Metric', {'1':'ANT50','2':'ANT_FEED'})
     add('C34','Device:C', 344, 258, 'DNP (tune)','Capacitor_SMD:C_0402_1005Metric', {'1':'ANT_FEED','2':GND}, dnp=True)
-    add('E1','Device:Antenna', 352, 232, '2450AT07A0100','pstat:Johanson_2450AT07A0100', {'1':'ANT_FEED'})
+    add('E1','pstat:2450AT07A0100', 352, 232, '2450AT07A0100','pstat:Johanson_2450AT07A0100', {'1':'ANT_FEED','4':'ANT_FEED','2':GND,'3':GND})
     add('R14','Device:R', 330, 165, '1k','Resistor_SMD:R_0402_1005Metric', {'1':'LED_R','2':'LED_A'})
     add('D1','Device:LED', 330, 180, 'GREEN','LED_SMD:LED_0603_1608Metric', {'1':GND,'2':'LED_A'})
     add('J2','Connector_Generic:Conn_01x05', 340, 220, 'SWD','pstat:SolderPads_1x05_D1.0mm', {
