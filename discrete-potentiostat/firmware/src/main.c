@@ -70,7 +70,7 @@ static K_SEM_DEFINE(start_sem, 0, 1);
 static struct pstat_config g_cfg = {  /* 기본값 (rf/os 는 NVM 이 덮음) */
 	.rate_hz = 10, .mode = PSTAT_MODE_CONTINUOUS, .autorange = true,
 	.range_idx = 0, .duration_s = 60, .on_s = 5, .off_s = 295, .cycles = 0,
-	.rf_ohm = 1000000, .oversample = 64,
+	.rf_ohm = 2000000, .oversample = 64,
 };
 static struct pstat_cal g_cal = { .scale = 1.0f, .off_nA = { 0 } };
 static K_MUTEX_DEFINE(cfg_lock);
