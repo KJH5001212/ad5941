@@ -9,7 +9,7 @@
  *  SAADC 차동 −     VREF 1.024V  P0.03 / AIN1   REF35102 출력
  *  VBAT 모니터      VBAT_DIV     P0.04 / AIN2   1M:1M 분압 (VBAT/2)
  *  Qi 패드 감지     Charge       P0.05 / AIN3   MCP73832_VDD(≈5V) 1M:1M 분압
- *  AFE 전원(AVDD)   AVDD         P0.12          high-drive, REF35+LPV802 (~2µA)
+ *  AFE 전원(AVDD)   AVDD         P0.26          high-drive, REF35+LPV802 (~2µA)
  *  충전 상태        GPIO(STAT)   P0.08          MCP73832 STAT, 100k 풀업, LOW=충전중
  *  상태 LED(옵션)   —            P0.06          기본 미실장 — 실장 시 그대로 동작
  *  RESET/SWDIO/SWDCLK = 표준 SWD
@@ -40,7 +40,7 @@
 / {
 	zephyr,user {
 		/* AVDD 직접 급전: 부하 ~2µA. high-drive 로 C36(10µF) 충전 가속 */
-		afe-pwr-gpios = <&gpio0 12 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>;
+		afe-pwr-gpios = <&gpio0 26 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>;
 		led-gpios     = <&gpio0 6 GPIO_ACTIVE_HIGH>;  /* 옵션 — 미실장이어도 무해 */
 		/* STAT 오픈드레인 + 외부 100k 풀업 → 내부 풀 불필요, LOW=충전중 */
 		chg-gpios     = <&gpio0 8 GPIO_ACTIVE_LOW>;
