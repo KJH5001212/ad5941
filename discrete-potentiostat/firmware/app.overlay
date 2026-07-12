@@ -39,7 +39,7 @@
 
 / {
 	zephyr,user {
-		/* AVDD 직접 급전: 부하 ~2µA. high-drive 로 C36(10µF) 충전 가속 */
+		/* AVDD 직접 급전: 부하 ~2µA (REF35 VIN 100nF + LPV802 100nF) */
 		afe-pwr-gpios = <&gpio0 26 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>;
 		led-gpios     = <&gpio0 6 GPIO_ACTIVE_HIGH>;  /* 옵션 — 미실장이어도 무해 */
 		/* STAT 오픈드레인 + 외부 100k 풀업 → 내부 풀 불필요, LOW=충전중 */
