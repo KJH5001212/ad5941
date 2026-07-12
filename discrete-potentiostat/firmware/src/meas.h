@@ -6,7 +6,7 @@
  *   AIN1 = P0.03 = VREF 1.024 V (차동 −)
  *   AIN2 = P0.04 = VBAT × 1/2   (1 MΩ:1 MΩ 분압)
  *   AIN3 = P0.05 = Charge = MCP73832_VDD × 1/2 (Qi 패드 감지, 패드 위 ≈2.5 V)
- *   P0.07 = AVDD 직접 급전 (high-drive, REF35102 + LPV802 ~2 µA)
+ *   P0.12 = AVDD 직접 급전 (high-drive, REF35102 + LPV802 ~2 µA)
  *   P0.08 = /CHG (MCP73832 STAT, 오픈드레인+100k 풀업, LOW=충전중)
  *   P0.06 = LED (옵션, 기본 미실장)
  */
