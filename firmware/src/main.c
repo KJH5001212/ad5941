@@ -386,10 +386,12 @@ static void afe_adc_cfg(void)
 
 	filt.ADCRate             = ADCRATE_800KHZ;
 	filt.ADCSinc3Osr         = ADCSINC3OSR_4;
-	filt.ADCSinc2Osr         = ADCSINC2OSR_1333;
+	filt.ADCSinc2Osr         = ADCSINC2OSR_1333;   /* 150Hz — 50/60Hz 노치 지원 OSR */
 	filt.ADCAvgNum           = ADCAVGNUM_16;
 	filt.BpSinc3             = bFALSE;
-	filt.BpNotch             = bTRUE;
+	filt.BpNotch             = bFALSE;   /* 50/60Hz 노치 활성 — 전원험 제거.
+					      * (bTRUE 바이패스 시절: 5.1M 노드 험 버스트가
+					      * 측정창 2개에 상보 쌍(±90nA)으로 새어들었음) */
 	filt.Sinc2NotchEnable    = bTRUE;
 	filt.Sinc3ClkEnable      = bTRUE;
 	filt.Sinc2NotchClkEnable = bTRUE;
@@ -521,6 +523,7 @@ static bool sample_once(struct pstat_sample *smp)
 {
 	uint32_t period_ms = 1000U / rc.rate_hz;   /* rate 1~100 -> 10~1000ms */
 	float vsum = 0.0f;
+	float vmin = 1e30f, vmax = -1e30f;
 	int cnt = 0;
 
 	/* 레인지 변경 직후 세틀 구간 SINC2 는 폐기 */
@@ -540,7 +543,10 @@ static bool sample_once(struct pstat_sample *smp)
 			return false;
 		}
 		uint32_t code = AD5940_ReadAfeResult(AFERESULT_SINC2);
-		vsum += AD5940_ADCCode2Volt(code, ADC_PGA, ADC_VREF);
+		float v = AD5940_ADCCode2Volt(code, ADC_PGA, ADC_VREF);
+		vsum += v;
+		if (v < vmin) vmin = v;
+		if (v > vmax) vmax = v;
 		cnt++;
 	} while ((int32_t)(k_uptime_get_32() - next_due) < 0);
 
@@ -550,7 +556,14 @@ static bool sample_once(struct pstat_sample *smp)
 		next_due = k_uptime_get_32() + period_ms;
 	}
 
-	float vavg = vsum / (float)cnt;
+	/* 절사평균: 창 안의 최대/최소 1개씩 버림 — 단발 스파이크(험 버스트,
+	 * 정전기 등)가 창 평균을 ±수십 nA 끌고가는 것 방지 (샘플 6개 이상일 때) */
+	float vavg;
+	if (cnt >= 6) {
+		vavg = (vsum - vmin - vmax) / (float)(cnt - 2);
+	} else {
+		vavg = vsum / (float)cnt;
+	}
 	smp->current_nA = (vavg / rtia_ohm[cur_range]) * 1e9f;   /* 캘된 실측 RTIA 사용 */
 	smp->t_ms       = k_uptime_get_32() - run_t0;
 	smp->range_idx  = (uint8_t)cur_range;
