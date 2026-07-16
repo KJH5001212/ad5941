@@ -71,8 +71,60 @@ static const struct { uint8_t sel; float ohm; } RTIA_TAB[] = {
 };
 #define RTIA_N ((int)ARRAY_SIZE(RTIA_TAB))
 
+/* 실측 RTIA(Ω). sample_once 는 이 값으로 전류를 계산한다.
+ * 우선순위: (1) 부팅 시 공칭 × RTIA_TRIM (5.1MΩ 1% 기준셀 1점 실측 보정)
+ *          (2) RCAL 자동캘 — 재현성 게이트(cal_healthy)를 통과할 때만 덮어씀.
+ * 벤더링된 ad5940lib 의 LPRtiaCal 은 구버전 버그 의심(ADI CHANGELOG v0.1.2/0.1.4 에
+ * LPTIA 캘 수정 이력, 포럼에 동일 증상 보고) → 신뢰 못 하므로 게이트 필수. */
+static float rtia_ohm[RTIA_N];
+
+/* 5.1MΩ 1% 더미셀 1점 보정 트림 (2026-07-15 실측, 폐루프 바이어스 500mV 확정 후).
+ * 기준전류 98.04nA(=500mV/5.1M) 대비 각 레인지 평균 읽음값의 비 = 실효 RTIA/공칭.
+ * 게인 오차(RTIA 공차+ADC 게인)를 통째로 흡수한다. 각 평균은 240샘플(SEM ~1%). */
+static const float RTIA_TRIM[RTIA_N] = {
+	1.0459f,   /* 512k — 실측 102.54nA */
+	1.0735f,   /* 256k — 실측 105.25nA */
+	1.0874f,   /* 128k — 실측 106.61nA */
+	1.0948f,   /*  64k — 실측 107.34nA */
+	1.0991f,   /*  32k — 실측 107.76nA */
+	1.0990f,   /*  16k — 실측 107.74nA */
+	1.0917f,   /*   8k — 실측 107.03nA */
+	1.09f,     /*   4k — 외삽 (32k~8k 추세 평탄 ~1.09) */
+	1.09f,     /*   2k — 외삽 */
+	1.09f,     /*   1k — 외삽 */
+	1.0f,      /* 110Ω — 미측정 (98nA 신호 ~2LSB 라 측정 불가), 공칭 유지 */
+};
+
+#define RCAL_OHM  1.0e6f   /* R5: RCAL0-RCAL1 간 실물 1MΩ 1% (2026-07-16 재실장 —
+			    * 이전 100k/510k 는 엉뚱한 패드에 실장돼 무효였음).
+			    * 캘 정확도 = 이 저항의 정확도. 교체 시 이 값도 수정. */
+
 /* ===================== 진단 전역 (SWD로 직접 읽기) ===================== */
 volatile uint32_t g_adiid[4];
+volatile float    g_rtia_cal[RTIA_N];   /* 캘 결과 확인용 (SWD) */
+volatile int32_t  g_cal_ret[RTIA_N];    /* LPRtiaCal 반환코드 (진단) */
+volatile float    g_rtia_raw[RTIA_N];   /* 캘 원시 magnitude (거부 전, 진단) */
+volatile float    g_bias_mv = -1.0f;    /* ADC 로 자가측정한 실제 셀 바이어스(mV) */
+#define CAL_EXP_N 6
+volatile int32_t  g_cal_exp[CAL_EXP_N]; /* 캘 재현성 실험: 512k 연속 6회 결과(Ω) */
+
+/* 온디맨드 캘 요청({"cmd":"cal"})과 결과 보고 플래그.
+ * 캘은 부팅에서 돌리지 않는다 — lib 캘이 AFE 삐끗 시 행/장시간 소요 위험이
+ * 있어(타임아웃 패치로 완화했지만) 부팅은 빠르고 안전하게 유지. */
+static volatile bool cal_req;
+static volatile bool cal_report_req;
+volatile int32_t  g_dac12_trim;         /* 폐루프 바이어스 트림 (12bit DAC 코드 오프셋) */
+
+/* Vbias(RE) 12bit DAC 코드 = 공칭 + 폐루프 트림. 실측에서 바이어스가 +23%(614mV)
+ * 나와 부팅 시 자가측정으로 코드를 보정해 실제 500mV 에 맞춘다. */
+static int16_t dac12_trim;
+
+static uint16_t dac12_code(void)
+{
+	int32_t c = (int32_t)((VZERO_MV - CELL_BIAS_MV - 200.0f) / DAC12_LSB_MV + 0.5f)
+		    + dac12_trim;
+	return (uint16_t)CLAMP(c, 0, 4095);
+}
 volatile uint32_t g_chipid;
 
 /* ===================== 상태 ===================== */
@@ -128,11 +180,175 @@ static int ad5941_afe_init(void)
 	return (g_adiid[0] == AD5940_ADIID) ? 0 : -1;
 }
 
+/* RCAL(R5=10MΩ 1%)로 내부 RTIA 각 레인지를 DC 자가보정 → rtia_ohm[] 에 실측값
+ * 저장. 내부 RTIA ±20% 공차를 제거해 전류 정확도를 맞춘다. RCAL(10M)이 작은
+ * RTIA 와 크게 어긋나는 조합은 캘이 부정확할 수 있어, 공칭의 0.5~2배를 벗어난
+ * 결과는 버리고 공칭을 유지한다. */
+static bool cal_healthy;   /* RCAL 자동캘 신뢰 가능 여부 (재현성 게이트 통과) */
+
+/* 한 레인지 LPRtiaCal 실행. ADI 공식 예제(Amperometric) 레시피 그대로:
+ *  - AC 캘 필수 (DC 는 ADC/PGA 선행 캘 필요 — ADI 주석 명시. 실제로 랜덤값)
+ *  - fFreq 는 SINC2(OSR22)+DFT(2048) 체인의 bin 에 정렬: AdcClk/4/22/2048*3 ≈266.3Hz
+ * 반환: magnitude(Ω), 실패 시 -1. */
+static float lprtia_cal_range_f(int i, float freq, float frcal)
+{
+	LPRTIACal_Type cal;
+	fImpPol_Type res;
+
+	AD5940_StructInit(&cal, sizeof(cal));
+	cal.LpAmpSel     = LPAMP0;
+	cal.fFreq        = freq;
+	cal.fRcal        = frcal;
+	cal.LpTiaRtia    = RTIA_TAB[i].sel;
+	cal.LpAmpPwrMod  = LPAMPPWR_NORM;
+	cal.bWithCtia    = bFALSE;
+	cal.ADCSinc3Osr  = ADCSINC3OSR_4;
+	cal.ADCSinc2Osr  = ADCSINC2OSR_22;
+	cal.DftCfg.DftNum   = DFTNUM_2048;
+	cal.DftCfg.DftSrc   = DFTSRC_SINC2NOTCH;
+	cal.DftCfg.HanWinEn = bTRUE;
+	cal.SysClkFreq   = 16000000.0f;
+	cal.AdcClkFreq   = 16000000.0f;
+	cal.bPolarResult = bTRUE;
+
+	res.Magnitude = -1.0f;
+	int32_t err = AD5940_LPRtiaCal(&cal, &res);
+	g_cal_ret[i]  = err;              /* 진단: 반환코드 */
+	g_rtia_raw[i] = res.Magnitude;    /* 진단: 원시 결과(적용여부 무관) */
+	return (err == AD5940ERR_OK) ? res.Magnitude : -1.0f;
+}
+
+/* 기본 캘 주파수: SINC2(OSR22)+DFT(2048) bin 정렬, 신호 3주기 ≈266.3Hz */
+#define CAL_FREQ_3P  (16000000.0f / 4 / 22 / 2048 * 3)
+#define CAL_FREQ_1P  (16000000.0f / 4 / 22 / 2048)      /* 1주기 ≈88.8Hz */
+
+static float lprtia_cal_range(int i)
+{
+	/* 큰 RTIA(512k/256k/128k)는 fRcal 을 절반 RTIA 로 "낮춰 전달"해
+	 * 여기전압을 800mVpp 로 제한한다(클램프 미달) → lib 이 PGA1.5/2 를
+	 * 선택 → PGA 포화 제거(1M RCAL 에서 256k 가 PGA9 90%FS 로 -10%
+	 * 압축되던 문제). 결과는 실제 RCAL 로 재스케일:
+	 * result_lib = RTIA×fake/RCAL_실물 → ×(RCAL_OHM/fake) 로 복원. */
+	float fake = RCAL_OHM;
+	if (i <= 1) {
+		fake = RTIA_TAB[i].ohm * 0.5f;
+	} else if (i == 2) {
+		fake = RTIA_TAB[i].ohm * 0.35f;   /* 128k: V_rcal 압축(+7%) 줄이기 */
+	}
+	float m = lprtia_cal_range_f(i, CAL_FREQ_3P, fake);
+	return (m > 0.0f) ? m * (RCAL_OHM / fake) : m;
+}
+
+/* RCAL(1M) 자동캘 — 하이브리드 적용.
+ * 실측 결과(2026-07-16): 1M RCAL 에서 작은 RTIA(16k 이하)는 캘이 정확
+ * (1k +0.7%, 4k -2.8%, 16k -5.6%)하지만, 큰 RTIA(512k 등)는 캘 신호가
+ * 크고(±488mVpp) lib 의 PGA 선택 버그(자체 과소추정 → 과대게인)로 PGA
+ * 비선형 영역을 넘나들어 폭주(±134%). 따라서:
+ *  - 512k~32k (idx 0~4, nA 측정용): 물리 트림 유지 — 캘 절대 미적용
+ *  - 16k~110Ω (idx 5~10, µA 영역): 게이트 통과 시 캘 적용 (트림이 외삽/
+ *    미측정이던 영역이라 캘이 더 정확)
+ * 게이트 = 1k(idx 9) 2회 재현성 <3% + 공칭 0.6~1.6배 타당성. */
+#define CAL_APPLY_MIN 5    /* 캘 적용 시작 인덱스 (16k) */
+#define CAL_GATE_IDX  9    /* 게이트 판정 레인지 (1k — 캘 최적 영역) */
+
+/* 캘 결과 적용 스위치. 1 = 게이트 통과 시 16k~110Ω 에 적용.
+ * (그간의 캘 실패는 전부 하드웨어였음: R5 아닌 엉뚱한 패드 실장 + 플럭스
+ * 누설. 올바른 패드에 1M 1% + 세척 후: 1k 재현성 1.9%, 512k 캘이 물리
+ * 트림과 0.14% 일치로 교차검증 완료 — 2026-07-16.) */
+#define CAL_APPLY_ENABLE 1
+
+static void ad5941_rtia_cal(void)
+{
+	/* 웜업: 첫 4~6회 캘은 HS 루프/레퍼런스 미안정으로 크게 튐(실측 재현).
+	 * 버리는 실행으로 안정화시킨 뒤 판정에 들어간다. */
+	for (int r = 0; r < 4; r++) {
+		(void)lprtia_cal_range(CAL_GATE_IDX);
+		k_msleep(30);
+	}
+
+	/* 재현성 진단: 1k 연속 6회 (BLE cal 프레임의 "exp").
+	 * 게이트 = 6회 전체 스프레드 <10% + 평균이 공칭 0.6~1.6배.
+	 * (단일 런 노이즈 ±2~3% 라 "앞 2회 <3%" 는 경계선 동전던지기였음.
+	 *  정상 하드웨어 스프레드 3~6%, 고장 시절 18~185% — 10% 로 완벽 분리.) */
+	float mn = 1e30f, mx = -1e30f, sum = 0.0f;
+	for (int r = 0; r < CAL_EXP_N; r++) {
+		float v = lprtia_cal_range(CAL_GATE_IDX);
+		g_cal_exp[r] = (int32_t)v;
+		if (v < mn) mn = v;
+		if (v > mx) mx = v;
+		sum += v;
+		k_msleep(30);
+	}
+	float avg = sum / CAL_EXP_N;
+	float nom = RTIA_TAB[CAL_GATE_IDX].ohm;
+
+	cal_healthy = (CAL_APPLY_ENABLE && mn > 0.0f &&
+		       (mx - mn) < 0.10f * avg &&
+		       avg > 0.6f * nom && avg < 1.6f * nom);
+
+	/* 전 레인지 적용 (2회 실행 일치 시 평균). 기준은 레인지 클래스별:
+	 *  - 큰 레인지(512k~32k, i<CAL_APPLY_MIN): 물리 트림(0.2% 검증)이 기준점.
+	 *    캘이 3% 이내로 재현되고 트림의 ±15% 안일 때만 대체 — 아니면 트림 유지.
+	 *  - 작은 레인지(16k~110Ω): 8% 일치 + 공칭 0.6~1.6배 (트림이 외삽이던 영역). */
+	for (int i = 0; i < RTIA_N; i++) {
+		float m1 = lprtia_cal_range(i);
+		float m2 = lprtia_cal_range(i);
+		float d = (m1 > m2) ? m1 - m2 : m2 - m1;
+		bool ok;
+		if (i < CAL_APPLY_MIN) {
+			/* 큰 레인지: 트림 ±8% — 온도추적은 허용, 캘 계통오차는 차단 */
+			ok = (m1 > 0.0f && m2 > 0.0f && d < 0.03f * m1 &&
+			      m1 > 0.92f * rtia_ohm[i] && m1 < 1.08f * rtia_ohm[i]);
+		} else {
+			ok = (m1 > 0.0f && m2 > 0.0f && d < 0.08f * m1 &&
+			      m1 > 0.6f * RTIA_TAB[i].ohm && m1 < 1.6f * RTIA_TAB[i].ohm);
+		}
+		if (cal_healthy && ok) {
+			rtia_ohm[i] = 0.5f * (m1 + m2);
+		}
+		g_rtia_cal[i] = rtia_ohm[i];   /* 진단(SWD) */
+	}
+	LOG_INF("RTIA cal %s: 16k=%.0f 1k=%.0f (Ω)",
+		cal_healthy ? "APPLIED(16k~110)" : "diag-only",
+		(double)rtia_ohm[5], (double)rtia_ohm[9]);
+}
+
+static float measure_bias_mv(void);   /* 아래 정의 (AFE 헬퍼 뒤) */
+static bool bias_trimmed;
+
+/* 폐루프 바이어스 트림 (1회): 실측(Vzero-Vbias 핀)이 CELL_BIAS_MV 에 수렴하도록
+ * 12bit DAC 코드를 보정. 실측 +23%(614mV) 오차 해결. DAC 실제 기울기가 공칭
+ * LSB 와 ~20% 다를 수 있어 0.7 감쇠로 진동 없이 수렴. 부팅과 start 경로 양쪽에서
+ * 호출 — 부팅 때 AFE 가 죽어 있다가 start 재초기화로 살아난 경우에도 트림 보장. */
+static void bias_trim_once(void)
+{
+	if (bias_trimmed || g_adiid[0] != AD5940_ADIID) {
+		return;
+	}
+	for (int it = 0; it < 8; it++) {
+		float mv = measure_bias_mv();
+		if (mv < 0.0f) {
+			return;   /* 측정 실패 → 다음 기회에 재시도 */
+		}
+		float err = mv - CELL_BIAS_MV;
+		if (err < 2.0f && err > -2.0f) {
+			break;   /* ±2mV 수렴 */
+		}
+		/* bias = Vzero - Vbias → 바이어스가 크면 Vbias 코드를 올린다 */
+		dac12_trim += (int16_t)(0.7f * err / DAC12_LSB_MV
+					+ (err > 0 ? 0.5f : -0.5f));
+	}
+	g_bias_mv = measure_bias_mv();   /* 최종 수렴값으로 보고 */
+	g_dac12_trim = dac12_trim;
+	bias_trimmed = true;
+	LOG_INF("bias self-measure: %.1f mV (dac12_trim=%d)",
+		(double)g_bias_mv, dac12_trim);
+}
+
 /* LP loop: RTIA 선택 + 바이어스 on/off 파라미터화 */
 static void afe_lploop_cfg(uint8_t rtia_sel, bool bias_on)
 {
 	LPLoopCfg_Type lp;
-	float vbias_mv = VZERO_MV - CELL_BIAS_MV;
 
 	AD5940_StructInit(&lp, sizeof(lp));
 	lp.LpDacCfg.LpdacSel      = LPDAC0;
@@ -144,7 +360,7 @@ static void afe_lploop_cfg(uint8_t rtia_sel, bool bias_on)
 	lp.LpDacCfg.PowerEn       = bias_on ? bTRUE : bFALSE;
 	lp.LpDacCfg.LpDacSW        = LPDACSW_VBIAS2LPPA | LPDACSW_VZERO2LPTIA;
 	lp.LpDacCfg.DacData6Bit    = (uint16_t)((VZERO_MV - 200.0f) / DAC6_LSB_MV + 0.5f);
-	lp.LpDacCfg.DacData12Bit   = (uint16_t)((vbias_mv - 200.0f) / DAC12_LSB_MV + 0.5f);
+	lp.LpDacCfg.DacData12Bit   = dac12_code();   /* 폐루프 트림 반영 */
 
 	lp.LpAmpCfg.LpAmpSel   = LPAMP0;
 	lp.LpAmpCfg.LpAmpPwrMod = LPAMPPWR_NORM;
@@ -223,6 +439,59 @@ static void afe_stop(void)
 	afe_lploop_cfg(RTIA_TAB[cur_range].sel, false);   /* 바이어스 off */
 }
 
+/* 실제 셀 바이어스(V(Vzero0)-V(Vbias0), mV)를 ADC 로 자가측정.
+ * LPDAC 양자화/게인 오차를 포함한 실측값 → 기준셀 전류(I=V/R) 계산과
+ * "전류 오차가 바이어스 탓인지 RTIA 탓인지" 분리에 사용. 부팅 시 1회. */
+static float measure_bias_mv(void)
+{
+	ADCBaseCfg_Type adc;
+	float sum = 0.0f;
+	int cnt = 0;
+
+	afe_lploop_cfg(RTIA_TAB[0].sel, true);   /* 바이어스 on */
+
+	/* Vzero0/Vbias0 "핀"은 2PIN 스위치를 닫아야 DAC 출력이 나온다.
+	 * (측정용으로만 잠시 라우팅 — afe_stop 의 lploop off 가 원복) */
+	LPDACCfg_Type dac;
+	AD5940_StructInit(&dac, sizeof(dac));
+	dac.LpdacSel      = LPDAC0;
+	dac.LpDacSrc      = LPDACSRC_MMR;
+	dac.LpDacVzeroMux = LPDACVZERO_6BIT;
+	dac.LpDacVbiasMux = LPDACVBIAS_12BIT;
+	dac.LpDacRef      = LPDACREF_2P5;
+	dac.DataRst       = bFALSE;
+	dac.PowerEn       = bTRUE;
+	dac.LpDacSW       = LPDACSW_VBIAS2LPPA | LPDACSW_VZERO2LPTIA |
+			    LPDACSW_VBIAS2PIN | LPDACSW_VZERO2PIN;
+	dac.DacData6Bit   = (uint16_t)((VZERO_MV - 200.0f) / DAC6_LSB_MV + 0.5f);
+	dac.DacData12Bit  = dac12_code();   /* 폐루프 트림 반영 */
+	AD5940_LPDACCfgS(&dac);
+	k_msleep(10);   /* 핀 세틀 */
+
+	afe_adc_cfg();
+	adc.ADCMuxP = ADCMUXP_VZERO0;    /* WE 동작점 (Vzero0 핀) */
+	adc.ADCMuxN = ADCMUXN_VBIAS0;    /* RE (Vbias0 핀) → P-N = 셀 바이어스 */
+	adc.ADCPga  = ADC_PGA;
+	AD5940_ADCBaseCfgS(&adc);
+	AD5940_AFECtrlS(AFECTRL_HPREFPWR | AFECTRL_ADCPWR, bTRUE);
+	k_msleep(50);
+	AD5940_INTCCfg(AFEINTC_1, AFEINTSRC_SINC2RDY, bTRUE);
+	AD5940_INTCClrFlag(AFEINTSRC_SINC2RDY);
+	AD5940_AFECtrlS(AFECTRL_ADCCNV, bTRUE);
+	for (int i = 0; i < 22; i++) {
+		if (!wait_sinc2()) {
+			break;
+		}
+		uint32_t code = AD5940_ReadAfeResult(AFERESULT_SINC2);
+		if (i >= 6) {   /* 파이프라인 프라이밍 폐기 */
+			sum += AD5940_ADCCode2Volt(code, ADC_PGA, ADC_VREF);
+			cnt++;
+		}
+	}
+	afe_stop();
+	return cnt ? (sum / cnt) * 1000.0f : -1.0f;
+}
+
 /* 레인지 전환 (측정 중) */
 static void apply_range(int idx)
 {
@@ -282,7 +551,7 @@ static bool sample_once(struct pstat_sample *smp)
 	}
 
 	float vavg = vsum / (float)cnt;
-	smp->current_nA = (vavg / RTIA_TAB[cur_range].ohm) * 1e9f;
+	smp->current_nA = (vavg / rtia_ohm[cur_range]) * 1e9f;   /* 캘된 실측 RTIA 사용 */
 	smp->t_ms       = k_uptime_get_32() - run_t0;
 	smp->range_idx  = (uint8_t)cur_range;
 	if (rc.autorange) {
@@ -394,11 +663,23 @@ static void meas_thread(void)
 				k_msleep(30);
 			}
 			if (g_adiid[0] != AD5940_ADIID) {
-				LOG_ERR("AFE 재초기화 실패 — start 거부");
+				LOG_ERR("AFE 재초기화 실패 — start/cal 거부");
+				cal_req = false;
 				atomic_set(&g_state, PSTAT_IDLE);
 				status_req = true;
 				continue;
 			}
+		}
+		bias_trim_once();   /* 부팅 때 AFE 죽어 트림 못 했으면 여기서 (없인 +23%) */
+		if (cal_req) {
+			cal_req = false;
+			ad5941_rtia_cal();       /* 온디맨드 RCAL 캘 (게이트 통과 시 적용) */
+			cal_report_req = true;   /* 결과 BLE 진단 프레임 전송 */
+			status_req = true;
+			if (atomic_get(&g_state) != PSTAT_RUN) {
+				continue;   /* 캘만 요청됨 — idle 유지 */
+			}
+			/* 캘 중 start 도착(세마포어 합쳐짐) → 이어서 측정 실행 */
 		}
 		k_mutex_lock(&cfg_lock, K_FOREVER);
 		rc = g_cfg;   /* 스냅샷 */
@@ -544,6 +825,15 @@ static void nus_received(struct bt_conn *conn, const uint8_t *data, uint16_t len
 	case CMD_STATUS:
 		status_req = true;
 		break;
+	case CMD_CAL:
+		if (atomic_get(&g_state) == PSTAT_IDLE) {
+			cal_req = true;
+			k_sem_give(&start_sem);
+			LOG_INF("cmd: cal");
+		} else {
+			LOG_WRN("cmd: cal 무시 (측정 중 — stop 먼저)");
+		}
+		break;
 	default:
 		break;
 	}
@@ -553,6 +843,9 @@ static void nus_received(struct bt_conn *conn, const uint8_t *data, uint16_t len
 static void nus_send_enabled(enum bt_nus_send_status status)
 {
 	notif_enabled = (status == BT_NUS_SEND_STATUS_ENABLED);
+	if (notif_enabled) {
+		cal_report_req = true;   /* 연결되면 캘 진단 프레임 1회 전송 */
+	}
 	LOG_INF("NUS notify %s", notif_enabled ? "ENABLED" : "disabled");
 }
 
@@ -606,6 +899,35 @@ static void tx_status(void)
 	tx_nus(line, n);
 }
 
+/* 캘 진단: 각 레인지의 LPRtiaCal 반환코드 + 원시 magnitude(Ω) 를 BLE 로 1회 전송.
+ * SWD 대신 PC(bleak)로 읽어 auto-cal 실패 원인 분석. 형식: {"cal":[[i,ret,raw],...]} */
+static void tx_caldbg(void)
+{
+	char line[360];   /* MTU 247 초과분은 bt_nus_send 가 청크 분할 */
+	int o = snprintk(line, sizeof(line), "{\"cal\":[");
+	for (int i = 0; i < RTIA_N; i++) {
+		size_t rem = (o < (int)sizeof(line)) ? sizeof(line) - o : 0;
+		o += snprintk(line + o, rem, "%s[%d,%d,%d]",
+			i ? "," : "", i, (int)g_cal_ret[i], (int)g_rtia_raw[i]);
+	}
+	size_t rem = (o < (int)sizeof(line)) ? sizeof(line) - o : 0;
+	o += snprintk(line + o, rem, "],\"bias_mv\":%d,\"applied\":%d,\"exp\":[",
+		      (int)g_bias_mv, (int)cal_healthy);
+	for (int i = 0; i < CAL_EXP_N; i++) {
+		rem = (o < (int)sizeof(line)) ? sizeof(line) - o : 0;
+		o += snprintk(line + o, rem, "%s%d", i ? "," : "", g_cal_exp[i]);
+	}
+	rem = (o < (int)sizeof(line)) ? sizeof(line) - o : 0;
+	o += snprintk(line + o, rem, "]}\n");
+	/* MTU(247)-3 보다 길 수 있으므로 200B 단위로 분할 전송 (수신측은 \n 재조립) */
+	for (int off = 0; off < o; off += 200) {
+		uint16_t n = (uint16_t)MIN(200, o - off);
+		if (tx_nus((const uint8_t *)line + off, n) != 0) {
+			break;
+		}
+	}
+}
+
 int main(void)
 {
 	int err;
@@ -617,6 +939,11 @@ int main(void)
 		return 0;
 	}
 	k_msleep(10);
+	/* 전류계산 RTIA = 공칭 × 실측 트림 (5.1MΩ 기준셀 1점 보정).
+	 * 자동캘은 게이트 통과 시에만 이 값을 덮어쓴다. */
+	for (int i = 0; i < RTIA_N; i++) {
+		rtia_ohm[i] = RTIA_TAB[i].ohm * RTIA_TRIM[i];
+	}
 	/* AFE init 실패 시 최대 5회 재시도(HWReset 반복). 마진 부족 부팅에서
 	 * AFE 가 한 번에 안 올라와도 되살아날 확률을 높인다. */
 	int boot_try = 0;
@@ -626,6 +953,9 @@ int main(void)
 	}
 	if (g_adiid[0] != AD5940_ADIID) {
 		LOG_WRN("ADIID mismatch — BLE 는 올리되 측정 불가");
+	} else {
+		bias_trim_once();   /* 폐루프 바이어스 트림 → 실제 500mV */
+		/* RCAL 자동캘은 부팅에서 안 돌린다 — {"cmd":"cal"} 로 온디맨드 실행 */
 	}
 	/* 부팅 후 AFE 는 꺼둔 상태 (start 명령 대기) */
 	afe_lploop_cfg(RTIA_TAB[0].sel, false);
@@ -655,6 +985,12 @@ int main(void)
 					current_conn ? 1 : 0);
 			}
 			continue;
+		}
+
+		/* 연결 직후 캘 진단 1회 전송 (PC 로 auto-cal 반환코드/원시값 분석) */
+		if (cal_report_req) {
+			cal_report_req = false;
+			tx_caldbg();
 		}
 
 		/* 데이터 드레인 (무손실: 전송 성공한 배치만 절대위치로 commit) */

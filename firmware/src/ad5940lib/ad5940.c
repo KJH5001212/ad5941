@@ -3879,7 +3879,18 @@ AD5940Err AD5940_LPRtiaCal(LPRTIACal_Type *pCalCfg, void *pResult)
     AD5940_Delay10us(25);
     AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT, bTRUE);
     /* Wait until DFT ready */
-    while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);  
+    {  /* [로컬패치] 무한대기 -> 3s 타임아웃: AFE 무응답(브라운아웃 등) 시 호출자 행 방지 */
+      int32_t dft_guard = 30000;
+      while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE)
+      {
+        AD5940_Delay10us(10);
+        if(--dft_guard <= 0)
+        {
+          AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT|AFECTRL_WG|AFECTRL_ADCPWR, bFALSE);
+          return AD5940ERR_TIMEOUT;
+        }
+      }
+    }
     AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT|AFECTRL_WG|AFECTRL_ADCPWR, bFALSE);  /* Stop ADC convert and DFT */
     AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);
     DftRcal.Real = AD5940_ReadAfeResult(AFERESULT_DFTREAL);
@@ -3900,7 +3911,18 @@ AD5940Err AD5940_LPRtiaCal(LPRTIACal_Type *pCalCfg, void *pResult)
     AD5940_Delay10us(25);
     AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT, bTRUE);
     /* Wait until DFT ready */
-    while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);  
+    {  /* [로컬패치] 무한대기 -> 3s 타임아웃 (위와 동일) */
+      int32_t dft_guard = 30000;
+      while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE)
+      {
+        AD5940_Delay10us(10);
+        if(--dft_guard <= 0)
+        {
+          AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT|AFECTRL_WG|AFECTRL_ADCPWR, bFALSE);
+          return AD5940ERR_TIMEOUT;
+        }
+      }
+    }
     AD5940_AFECtrlS(AFECTRL_ADCCNV|AFECTRL_DFT|AFECTRL_WG|AFECTRL_ADCPWR, bFALSE);  /* Stop ADC convert and DFT */
     AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);
     DftRtia.Real = AD5940_ReadAfeResult(AFERESULT_DFTREAL);

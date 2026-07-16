@@ -19,6 +19,7 @@ enum cmd_type {
 	CMD_STOP,
 	CMD_ACK,
 	CMD_STATUS,
+	CMD_CAL,     /* {"cmd":"cal"} — RCAL 자동캘 온디맨드 실행 (idle 에서만) */
 };
 
 struct cmd {

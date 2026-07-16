@@ -92,6 +92,10 @@ bool cmd_parse(const char *json, size_t len, struct cmd *out,
 		out->type = CMD_STATUS;
 		return true;
 	}
+	if (!strcmp(c, "cal")) {
+		out->type = CMD_CAL;
+		return true;
+	}
 	if (!strcmp(c, "config") || !strcmp(c, "start")) {
 		out->type = strcmp(c, "start") ? CMD_CONFIG : CMD_START;
 		out->cfg = *base;   /* 미지정 필드는 현재값 유지 */
